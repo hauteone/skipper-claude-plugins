@@ -25,16 +25,19 @@ plugins/skipper/
 └── skills/pe-research/SKILL.md    # PE 심사 리서치 플레이북 (도구 라우팅·인용 규율)
 ```
 
-### 도구 개요 (34종)
+## API 키 설정
 
-- **지식그래프 15종** — `hybrid_search`(뉴스 하이브리드 검색), `graph_query`(자연어→Cypher),
-  `resolve_company`, `company_profile`, `financial_statements`, `list_disclosures`,
-  `get_document`(섹션 정조준), `search_disclosures`(전 시장 공시 스크리닝),
-  `shareholders_detail`(주주 구성·지분공시 이력), `shareholder_screen`(주주 역탐색),
-  `financial_notes`(XBRL 주석), `dividend_history`, `smart_money_signal`,
-  `segment_facts`, `fs_reports`
-- **정형 데이터 19종 (api_\*)** — 시세·재무제표·재무비율·배당·수급·ETF·컨센서스·스크리너
-  (FMP 호환 스키마)
+키는 셸 환경변수 `SKIPPER_API_KEY`로 입력합니다 — 플러그인의 MCP 설정이
+`${SKIPPER_API_KEY}`를 참조해 요청 헤더(`X-API-Key`)에 자동으로 넣습니다.
+
+```bash
+# 셸 프로필(~/.zshrc 또는 ~/.bashrc)에 한 줄 추가 후 터미널 재시작
+echo 'export SKIPPER_API_KEY=sk-skp-...' >> ~/.zshrc
+```
+
+확인: Claude Code 대화창에서 `/mcp` 입력 → `skipper` 서버가 connected로 보이면
+정상입니다. 환경변수 없이 실행하면 서버 연결이 실패하니, 키를 넣은 뒤 Claude
+Code를 재시작하세요.
 
 ## 사내망 (GitHub 접근 불가 시)
 
