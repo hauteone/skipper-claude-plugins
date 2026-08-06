@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "skipper": {
+      "type": "http",
+      "url": "https://api.skipperlabs.ai/mcp",
+      "headers": {
+        "X-API-Key": "${SKIPPER_API_KEY}"
+      }
+    }
+  }
+}
