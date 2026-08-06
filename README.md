@@ -50,10 +50,14 @@ claude plugin install skipper@skipperlabs
 
 필요한 아웃바운드는 `api.skipperlabs.ai:443` 하나입니다.
 
-## 조직 일괄 배포 (IT 관리자)
+## 조직 일괄 배포 (IT 관리자) — 공용 키 1개, 심사관 제로 셋업
 
-Claude Code 관리 설정(managed settings)에 아래를 배포하면 심사관 개입 없이
-자동 설치됩니다 (심사관은 `SKIPPER_API_KEY` 환경변수만 설정):
+조직 공용 API 키 1개를 관리 설정(managed settings)에 함께 배포하면, 심사관은
+아무것도 설정할 필요가 없습니다 (Claude Code 설치가 전부). 관리 설정의 `env`가
+모든 세션에 환경변수를 주입하므로 플러그인의 `${SKIPPER_API_KEY}` 참조가 자동으로
+채워집니다.
+
+**managed-settings.json** (전체 내용):
 
 ```json
 {
@@ -62,6 +66,26 @@ Claude Code 관리 설정(managed settings)에 아래를 배포하면 심사관 
       "source": { "source": "github", "repo": "hauteone/skipper-claude-plugins" }
     }
   },
-  "enabledPlugins": { "skipper@skipperlabs": true }
+  "enabledPlugins": { "skipper@skipperlabs": true },
+  "env": {
+    "SKIPPER_API_KEY": "sk-skp-공용키를-여기에"
+  }
 }
 ```
+
+**배포 위치** (MDM/스크립트로 배포, 관리자 권한 필요 — 사용자 설정보다 항상 우선):
+
+| OS | 경로 |
+|---|---|
+| macOS | `/Library/Application Support/ClaudeCode/managed-settings.json` |
+| Windows | `C:\ProgramData\ClaudeCode\managed-settings.json` |
+| Linux | `/etc/claude-code/managed-settings.json` |
+
+**공용 키 운영 참고**:
+
+- 공용 키는 SkipperLabs에 "조직 공용" 용도로 요청하세요 — rate limit을 무제한
+  또는 인원수에 맞게 넉넉히 설정해 발급합니다 (키 1개의 분당 한도를 전원이
+  공유하므로 개인용 기본값(60rpm)으로는 부족합니다).
+- 사용량 계측·차단이 조직 단위로만 가능해집니다 (개인별 식별 불가). 인원 변동
+  시 회수는 키 교체(재발급 + managed-settings.json 재배포)로 처리합니다.
+- 파일은 관리자만 쓰기 가능한 경로라 일반 사용자가 키를 수정할 수 없습니다.
