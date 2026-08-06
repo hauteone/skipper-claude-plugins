@@ -11,9 +11,22 @@ claude plugin marketplace add hauteone/skipper-claude-plugins
 claude plugin install skipper@skipperlabs
 ```
 
-설치 후 Claude Code를 재시작하면 `skipper` MCP 서버(도구 34종)와 `pe-research`
-스킬이 활성화됩니다. 확인: `claude mcp list` 또는 대화에서 "삼성전자 주주 구성
-알려줘"로 테스트.
+설치 후 Claude Code를 재시작하면 `skipper` MCP 서버(도구 34종), `pe-research`
+스킬, `/skipper` 커맨드가 활성화됩니다. 확인: `claude mcp list` 또는 대화에서
+`/skipper 삼성전자 주주 구성`으로 테스트.
+
+## 사용법
+
+```
+/skipper <질문>
+```
+
+예: `/skipper 삼성전자 최대주주 지분율 추이`, `/skipper 최근 1년 유상증자 결정한 코스닥 기업`
+
+`/skipper`로 질문하면 PE 심사 플레이북(도구 라우팅·인용 규율)이 자동 적용되고,
+기업 데이터는 skipper MCP 도구로만 조회하도록 강제됩니다. 일반 대화로 물어봐도
+동작하지만, 심사·평가 시에는 `/skipper` 사용을 권장합니다. (커맨드는 추후
+`/skipper:write` 같은 하위 커맨드로 확장될 수 있습니다.)
 
 API 키는 SkipperLabs가 사용자별로 발급합니다 — support@skipperlabs.ai
 
@@ -22,6 +35,7 @@ API 키는 SkipperLabs가 사용자별로 발급합니다 — support@skipperlab
 ```
 plugins/skipper/
 ├── .mcp.json                      # 리모트 MCP: https://api.skipperlabs.ai/mcp (X-API-Key 인증)
+├── commands/skipper.md            # /skipper 커맨드 — 리서치 진입점 (플레이북·MCP 도구 강제)
 └── skills/pe-research/SKILL.md    # PE 심사 리서치 플레이북 (도구 라우팅·인용 규율)
 ```
 

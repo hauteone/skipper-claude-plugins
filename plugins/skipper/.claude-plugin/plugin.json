@@ -1,7 +1,7 @@
 {
   "name": "skipper",
   "description": "한국·미국 상장기업 리서치 — SkipperLabs MCP 도구 34종 + PE 심사 리서치 플레이북. SKIPPER_API_KEY 환경변수에 발급받은 API 키가 필요합니다.",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "author": {
     "name": "SkipperLabs",
     "email": "support@skipperlabs.ai"
