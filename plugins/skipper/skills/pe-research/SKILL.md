@@ -3,13 +3,13 @@ name: pe-research
 description: >
   한국·미국 상장기업 리서치와 PE 심사 실무 플레이북. 기업의 지분 구조, 공시 이력,
   재무 검증, 배당, 시장 전체 공시 스크리닝 질문에 사용한다. skipper MCP 도구
-  34종의 라우팅 전략과 인용 규율을 담고 있다. Use when researching Korean or US
+  35종의 라우팅 전략과 인용 규율을 담고 있다. Use when researching Korean or US
   listed companies — shareholders, disclosures, financials, dividends, deal screening.
 ---
 
 # skipper PE 심사 리서치 플레이북
 
-skipper MCP 서버(도구 34종)를 사용해 상장기업을 조사할 때 아래 규율을 따른다.
+skipper MCP 서버(도구 35종)를 사용해 상장기업을 조사할 때 아래 규율을 따른다.
 이 플레이북은 korean-dart-mcp 대비 블라인드 비교 평가(20문항)에서 검증된 도구
 전략·답변 규칙을 담고 있다.
 
@@ -24,6 +24,7 @@ skipper MCP 서버(도구 34종)를 사용해 상장기업을 조사할 때 아�
 | 시장 전체 공시 스크리닝 (유상증자·CB·대량보유 등 "어떤 기업들이…") | `search_disclosures` | `get_document` |
 | 주주 기준 역탐색 (국민연금 보유 기업, A사의 타법인출자·계열) | `shareholder_screen` | `shareholders_detail` |
 | 재무제표·수익성·증감 분석 | `financial_statements` | `api_income_statement`, `api_ratios` |
+| 부문·지역·제품별 매출 추이 (연도별·분기별 표) | `segment_series` | `segment_facts`, `get_document` |
 | 재무제표 주석 (우발부채·약정·특수관계자·충당부채) | `financial_notes` | `get_document` |
 | 배당 이력·배당성향 | `dividend_history` | `api_dividends` |
 | 특정 기업의 공시 목록 | `list_disclosures` | — |

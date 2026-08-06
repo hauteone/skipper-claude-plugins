@@ -1,7 +1,7 @@
 # skipper-claude-plugins
 
 SkipperLabs 상장기업 리서치 플러그인 마켓플레이스 — Claude Code에 skipper MCP
-도구 34종과 PE 심사 리서치 플레이북을 한 번에 설치합니다.
+도구 35종과 PE 심사 리서치 플레이북을 한 번에 설치합니다.
 
 ## 설치 (심사관용, 3줄)
 
@@ -11,7 +11,7 @@ claude plugin marketplace add hauteone/skipper-claude-plugins
 claude plugin install skipper@skipperlabs
 ```
 
-설치 후 Claude Code를 재시작하면 `skipper` MCP 서버(도구 34종), `pe-research`
+설치 후 Claude Code를 재시작하면 `skipper` MCP 서버(도구 35종), `pe-research`
 스킬, `/skipper` 커맨드가 활성화됩니다. 확인: `claude mcp list` 또는 대화에서
 `/skipper 삼성전자 주주 구성`으로 테스트.
 

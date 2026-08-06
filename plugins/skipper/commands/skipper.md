@@ -1,5 +1,5 @@
 ---
-description: 한국·미국 상장기업 리서치 — skipper MCP 도구 34종 + PE 심사 플레이북으로 조사
+description: 한국·미국 상장기업 리서치 — skipper MCP 도구 35종 + PE 심사 플레이북으로 조사
 argument-hint: "<질문 — 예: 삼성전자 최대주주 지분율 추이>"
 allowed-tools: mcp__skipper, Skill, ToolSearch, Read
 ---
