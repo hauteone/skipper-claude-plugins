@@ -1,7 +1,7 @@
 {
   "name": "skipper",
   "description": "한국·미국 상장기업 리서치 — SkipperLabs MCP 도구 35종 + PE 심사 리서치 플레이북 + 실사 워크북 시트 생성 스킬 3종(Raw_BSPL·Raw_부문별매출·정리예시). SKIPPER_API_KEY 환경변수에 발급받은 API 키가 필요합니다.",
-  "version": "0.4.0",
+  "version": "0.4.1",
   "author": {
     "name": "SkipperLabs",
     "email": "support@skipperlabs.ai"
