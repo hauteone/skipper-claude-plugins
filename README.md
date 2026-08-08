@@ -11,22 +11,34 @@ claude plugin marketplace add hauteone/skipper-claude-plugins
 claude plugin install skipper@skipperlabs
 ```
 
-설치 후 Claude Code를 재시작하면 `skipper` MCP 서버(도구 35종), `pe-research`
-스킬, `/skipper` 커맨드가 활성화됩니다. 확인: `claude mcp list` 또는 대화에서
+설치 후 Claude Code를 재시작하면 `skipper` MCP 서버(도구 35종), 스킬 4종,
+`/skipper` 커맨드가 활성화됩니다. 확인: `claude mcp list` 또는 대화에서
 `/skipper 삼성전자 주주 구성`으로 테스트.
 
 ## 사용법
 
-```
-/skipper <질문>
-```
+### 리서치 — `/skipper <질문>`
 
 예: `/skipper 삼성전자 최대주주 지분율 추이`, `/skipper 최근 1년 유상증자 결정한 코스닥 기업`
 
 `/skipper`로 질문하면 PE 심사 플레이북(도구 라우팅·인용 규율)이 자동 적용되고,
-기업 데이터는 skipper MCP 도구로만 조회하도록 강제됩니다. 일반 대화로 물어봐도
-동작하지만, 심사·평가 시에는 `/skipper` 사용을 권장합니다. (커맨드는 추후
-`/skipper:write` 같은 하위 커맨드로 확장될 수 있습니다.)
+기업 데이터는 skipper MCP 도구로만 조회하도록 강제됩니다.
+
+### 실사 워크북 시트 만들기 — 스킬 3종
+
+DART 이용 예시 워크북의 세 개 탭을 각각 CSV로 만들어 줍니다. UTF-8 BOM으로 써서
+엑셀에서 더블클릭하면 한글이 깨지지 않고 바로 열립니다.
+
+| 커맨드 | 만드는 시트 | 내용 |
+|---|---|---|
+| `/skipper:raw-bspl <회사>` | Raw_BSPL | 정기보고서별 연결재무제표 4표(재무상태표·포괄손익·자본변동·현금흐름)를 보고서 단위 열 블록으로 |
+| `/skipper:raw-segment <회사>` | Raw_부문별매출 | 정기보고서별 "주요 제품 및 서비스" 원문 + XBRL 부문 팩트 표 |
+| `/skipper:segment-summary <회사>` | 정리예시 | 연도별·분기별 부문 매출액과 비중 (합계·비중 자동 계산) |
+
+예: `/skipper:raw-bspl SK`, `/skipper:raw-bspl 034730 --reports 6 --unit 억원`
+
+`segment-summary`는 초안을 만든 뒤 공시 원문 표로 검증·보정해 렌더링하는 2단계로
+동작합니다 — XBRL 부문 매출만으로는 분기 표가 채워지지 않는 기업이 많기 때문입니다.
 
 API 키는 SkipperLabs가 사용자별로 발급합니다 — support@skipperlabs.ai
 
@@ -34,10 +46,23 @@ API 키는 SkipperLabs가 사용자별로 발급합니다 — support@skipperlab
 
 ```
 plugins/skipper/
-├── .mcp.json                      # 리모트 MCP: https://api.skipperlabs.ai/mcp (X-API-Key 인증)
-├── commands/skipper.md            # /skipper 커맨드 — 리서치 진입점 (플레이북·MCP 도구 강제)
-└── skills/pe-research/SKILL.md    # PE 심사 리서치 플레이북 (도구 라우팅·인용 규율)
+├── .mcp.json                          # 리모트 MCP: https://api.skipperlabs.ai/mcp (X-API-Key 인증)
+├── commands/skipper.md                # /skipper 커맨드 — 리서치 진입점 (플레이북·MCP 도구 강제)
+├── scripts/                           # 시트 생성 스크립트 (표준 라이브러리만, 설치 불필요)
+│   ├── skipper_api.py                 #   공용 API 클라이언트
+│   ├── build_raw_bspl.py
+│   ├── build_raw_segment.py
+│   └── build_segment_summary.py
+└── skills/
+    ├── pe-research/SKILL.md           # PE 심사 리서치 플레이북 (도구 라우팅·인용 규율)
+    ├── raw-bspl/SKILL.md              # /skipper:raw-bspl
+    ├── raw-segment/SKILL.md           # /skipper:raw-segment
+    └── segment-summary/SKILL.md       # /skipper:segment-summary
 ```
+
+시트 생성 스크립트는 Python 3.9+ 표준 라이브러리만 씁니다 (`pip install` 불필요).
+`SKIPPER_API_KEY`로 `https://api.skipperlabs.ai/api/v1/tools/{도구}`를 직접 호출해
+수 MB짜리 재무제표 응답을 대화 컨텍스트를 거치지 않고 파일로 떨굽니다.
 
 ## API 키 설정
 
