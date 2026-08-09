@@ -43,22 +43,32 @@ echo 'export SKIPPER_API_KEY=sk-skp-...' >> ~/.zshrc   # 기존 환경변수 방
 
 ### 1단계 — 커넥터로 도구 붙이기 (필수)
 
-claude.ai → 설정 → **커넥터** → **커스텀 커넥터 추가** → URL에 아래를 입력
-(`sk-skp-...` 자리에 발급받은 키):
+claude.ai → 설정 → **커넥터** → **커스텀 커넥터 추가** → URL에 아래를 입력:
 
 ```
-https://api.skipperlabs.ai/mcp?apikey=sk-skp-...
+https://api.skipperlabs.ai/mcp
 ```
 
-OAuth 설정(고급 설정)은 필요 없습니다. 커넥터는 Claude 계정에 등록되므로
-claude.ai에서 한 번 추가하면 데스크탑 앱에도 그대로 나타납니다.
+이름은 `skipper`로 두고 **고급 설정(OAuth 클라이언트 ID·시크릿)은 비워 두세요** —
+서버가 동적 등록을 지원해 자동으로 처리됩니다.
 
-커스텀 커넥터는 HTTP 헤더를 지원하지 않아 키를 URL에 넣습니다. **키가 커넥터
-설정에 URL로 저장되므로 화면 공유·스크린샷 시 노출에 주의**하세요. 유출 시
-support@skipperlabs.ai 로 재발급을 요청하면 됩니다.
+**추가**를 누르면 연결 화면이 뜹니다. 여기서 발급받은 `sk-skp-...` 키를 한 번
+입력하면 끝입니다. 이후로는 토큰으로 통신하므로 **키가 커넥터 설정이나 URL에
+남지 않습니다.**
+
+커넥터는 Claude 계정에 등록되므로 claude.ai에서 한 번 추가하면 데스크탑 앱에도
+그대로 나타납니다.
 
 **네트워크**: 커넥터 연결은 사용자 PC가 아니라 Anthropic 서버에서 출발합니다.
 `api.skipperlabs.ai`는 공개 인터넷에 열려 있어 사내 방화벽 설정이 필요 없습니다.
+
+<details>
+<summary>URL에 키를 붙이는 예전 방식</summary>
+
+`https://api.skipperlabs.ai/mcp?apikey=sk-skp-...` 형태도 계속 동작합니다.
+다만 **키가 커넥터 설정에 URL로 저장되어 화면 공유·스크린샷·로그로 새기 쉽습니다.**
+MCP 인가 명세도 쿼리스트링 토큰을 금지하므로, 위의 OAuth 방식을 쓰세요.
+</details>
 
 ### 2단계 — 플러그인으로 스킬 붙이기 (선택)
 
@@ -80,12 +90,12 @@ support@skipperlabs.ai 로 재발급을 요청하면 됩니다.
 |---|---|---|
 | 플러그인만 설치했을 때 도구 | **안 잡힘** — 커넥터 필요 | 자동 연결 |
 | 스킬 | 4종 (`skills/`만) | 5종 (`commands/` 포함) |
-| `userConfig` API 키 설정 | 설정 UI 없음 (커넥터 URL로 대체) | `/plugin configure` |
+| `userConfig` API 키 설정 | 설정 UI 없음 (커넥터 OAuth로 대체) | `/plugin configure` |
 
 도구가 안 잡히는 직접 원인은 **키를 넣을 곳이 없어서**입니다. 데스크탑에는
 `/plugin configure`에 해당하는 UI가 없고 셸 환경변수도 없어, MCP 설정의 두 경로
-(`?apikey=`와 `X-API-Key`)가 모두 비어 인증에 실패합니다. 그래서 키를 URL에
-직접 담는 커넥터가 데스크탑의 경로입니다.
+(`?apikey=`와 `X-API-Key`)가 모두 비어 인증에 실패합니다. 커넥터는 OAuth로
+키를 받으므로 이 제약을 우회합니다.
 
 - **`/skipper` 커맨드** — `commands/` 항목은 데스크탑 스킬 목록에 나타나지
   않습니다. 자연어로 물어보면 되고, 도구는 동일하게 동작합니다. 플레이북이
@@ -158,7 +168,7 @@ plugins/skipper/
 | Claude Code | `/plugin configure skipper@skipperlabs` | macOS 키체인 (마스킹 입력) |
 | Claude Code | 셸 환경변수 `SKIPPER_API_KEY` | 셸 프로필 |
 | Claude Code 일괄 배포 | 조직 관리 설정 | managed-settings.json |
-| 데스크탑 / Cowork | 커넥터 URL의 `?apikey=` | 커넥터 설정 |
+| 데스크탑 / Cowork | 커넥터 연결 시 OAuth 동의 화면 | 서버 발급 토큰 (키는 미저장) |
 
 Claude Code는 설치 시 자동으로 묻지 않습니다 — `/plugin configure`를 직접
 실행하거나 환경변수를 쓰세요. 설치 직후 CLI가 `1 userConfig option not yet set`
@@ -187,7 +197,9 @@ MCP 설정이 키를 두 경로로 동시에 넘깁니다.
 
 API는 쿼리 파라미터를 먼저 보고, 비어 있으면 헤더로 폴백합니다. 그래서
 `/plugin configure`로 넣은 키와 환경변수 방식이 한 설정에서 함께 동작합니다.
-데스크탑 커넥터가 쓰는 `?apikey=`도 같은 경로입니다.
+
+데스크탑 커넥터는 이 경로를 쓰지 않습니다 — OAuth로 받은 Bearer 토큰을
+`Authorization` 헤더로 보냅니다.
 </details>
 
 ## 사내망 (GitHub 접근 불가 시, Claude Code)
