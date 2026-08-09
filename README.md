@@ -1,9 +1,19 @@
 # skipper-claude-plugins
 
-SkipperLabs 상장기업 리서치 플러그인 마켓플레이스 — Claude Code에 skipper MCP
-도구 35종과 PE 심사 리서치 플레이북을 한 번에 설치합니다.
+SkipperLabs 상장기업 리서치 플러그인 마켓플레이스 — 한국·미국 상장기업의 공시,
+지분, 재무, 배당, 뉴스를 연결한 지식그래프를 MCP 도구 35종으로 제공합니다.
+Claude Code와 Claude 데스크탑 양쪽에서 쓸 수 있습니다.
 
-## 설치 (심사관용, 3줄)
+API 키는 SkipperLabs가 사용자별로 발급합니다 — support@skipperlabs.ai
+
+| 환경 | 얻는 것 | 설치 |
+|---|---|---|
+| **Claude Code** | MCP 도구 35종 + 스킬 4종 + `/skipper` 커맨드 | 아래 3줄 |
+| **Claude 데스크탑 / claude.ai** | MCP 도구 35종 | 커스텀 커넥터 URL 1개 |
+
+---
+
+## Claude Code 설치 (3줄)
 
 ```bash
 export SKIPPER_API_KEY=sk-skp-...                          # 발급받은 API 키 (셸 프로필에 추가 권장)
@@ -15,14 +25,55 @@ claude plugin install skipper@skipperlabs
 `/skipper` 커맨드가 활성화됩니다. 확인: `claude mcp list` 또는 대화에서
 `/skipper 삼성전자 주주 구성`으로 테스트.
 
-## 사용법
+---
+
+## Claude 데스크탑 설치 (커스텀 커넥터)
+
+데스크탑에는 플러그인을 설치하지 않습니다. 대신 MCP 서버를 **커스텀 커넥터**로
+연결하면 도구 35종을 그대로 쓸 수 있습니다.
+
+커넥터는 Claude 계정에 등록되므로 **claude.ai에서 한 번 추가하면 데스크탑 앱에도
+그대로 나타납니다** (앱과 웹이 같은 계정 설정을 공유).
+
+1. claude.ai 접속 → 설정 → **커넥터**(Connectors) → **커스텀 커넥터 추가**
+2. 이름에 `skipper`, URL에 아래를 넣습니다 — `sk-skp-...` 자리에 발급받은 키:
+
+   ```
+   https://api.skipperlabs.ai/mcp?apikey=sk-skp-...
+   ```
+
+3. **추가**를 누르면 끝입니다. OAuth 설정(고급 설정)은 필요 없습니다.
+4. 대화창의 도구 목록에 `skipper`가 보이면 정상입니다.
+   `삼성전자 최대주주 지분율 알려줘`로 테스트하세요.
+
+**키를 URL에 넣는 이유**: 데스크탑 커스텀 커넥터는 커스텀 HTTP 헤더를 지원하지
+않아 `X-API-Key` 헤더를 넣을 수 없습니다. 그래서 API가 `?apikey=` 쿼리
+파라미터도 받도록 되어 있습니다. 다만 **키가 커넥터 설정에 URL로 저장되므로
+화면 공유나 스크린샷 시 노출에 주의**하세요. 키가 유출되면
+support@skipperlabs.ai 로 재발급을 요청하면 됩니다.
+
+**네트워크**: 커넥터 연결은 사용자 PC가 아니라 Anthropic 서버에서 출발합니다.
+`api.skipperlabs.ai`는 공개 인터넷에 열려 있어 별도 방화벽 설정이 필요 없습니다.
+
+### 데스크탑에서 안 되는 것
+
+플러그인의 나머지 구성요소는 Claude Code 전용입니다.
+
+- `/skipper` 커맨드와 `pe-research` 플레이북 — Claude Code에서만 자동 적용됩니다.
+  데스크탑에서는 그냥 자연어로 물어보면 되고, 도구는 동일하게 동작합니다.
+- **CSV 시트 생성 스킬 3종** — 로컬에서 파이썬 스크립트를 실행해 작업 폴더에
+  파일을 떨구는 방식이라 Claude Code에서만 의도대로 동작합니다.
+
+## 사용법 (Claude Code)
 
 ### 리서치 — `/skipper <질문>`
 
 예: `/skipper 삼성전자 최대주주 지분율 추이`, `/skipper 최근 1년 유상증자 결정한 코스닥 기업`
 
-`/skipper`로 질문하면 PE 심사 플레이북(도구 라우팅·인용 규율)이 자동 적용되고,
+`/skipper`로 질문하면 리서치 플레이북(도구 라우팅·인용 규율)이 자동 적용되고,
 기업 데이터는 skipper MCP 도구로만 조회하도록 강제됩니다.
+
+데스크탑에서는 `/skipper` 없이 자연어로 물어보면 됩니다 — 같은 도구를 씁니다.
 
 ### 실사 워크북 시트 만들기 — 스킬 3종
 
@@ -40,8 +91,6 @@ DART 이용 예시 워크북의 세 개 탭을 각각 CSV로 만들어 줍니다
 `segment-summary`는 초안을 만든 뒤 공시 원문 표로 검증·보정해 렌더링하는 2단계로
 동작합니다 — XBRL 부문 매출만으로는 분기 표가 채워지지 않는 기업이 많기 때문입니다.
 
-API 키는 SkipperLabs가 사용자별로 발급합니다 — support@skipperlabs.ai
-
 ## 구성
 
 ```
@@ -54,7 +103,7 @@ plugins/skipper/
 │   ├── build_raw_segment.py
 │   └── build_segment_summary.py
 └── skills/
-    ├── pe-research/SKILL.md           # PE 심사 리서치 플레이북 (도구 라우팅·인용 규율)
+    ├── pe-research/SKILL.md           # 리서치 플레이북 (도구 라우팅·인용 규율)
     ├── raw-bspl/SKILL.md              # /skipper:raw-bspl
     ├── raw-segment/SKILL.md           # /skipper:raw-segment
     └── segment-summary/SKILL.md       # /skipper:segment-summary
@@ -64,7 +113,7 @@ plugins/skipper/
 `SKIPPER_API_KEY`로 `https://api.skipperlabs.ai/api/v1/tools/{도구}`를 직접 호출해
 수 MB짜리 재무제표 응답을 대화 컨텍스트를 거치지 않고 파일로 떨굽니다.
 
-## API 키 설정
+## API 키 설정 (Claude Code)
 
 키는 셸 환경변수 `SKIPPER_API_KEY`로 입력합니다 — 플러그인의 MCP 설정이
 `${SKIPPER_API_KEY}`를 참조해 요청 헤더(`X-API-Key`)에 자동으로 넣습니다.
@@ -78,7 +127,9 @@ echo 'export SKIPPER_API_KEY=sk-skp-...' >> ~/.zshrc
 정상입니다. 환경변수 없이 실행하면 서버 연결이 실패하니, 키를 넣은 뒤 Claude
 Code를 재시작하세요.
 
-## 사내망 (GitHub 접근 불가 시)
+데스크탑은 환경변수를 쓰지 않습니다 — 커넥터 URL의 `?apikey=`가 그 역할을 합니다.
+
+## 사내망 (GitHub 접근 불가 시, Claude Code)
 
 repo를 zip으로 받아 압축 해제 후 로컬 경로로 등록:
 
@@ -89,9 +140,12 @@ claude plugin install skipper@skipperlabs
 
 필요한 아웃바운드는 `api.skipperlabs.ai:443` 하나입니다.
 
-## 조직 일괄 배포 (IT 관리자) — 공용 키 1개, 심사관 제로 셋업
+데스크탑 커넥터는 사내망 여부와 무관합니다 — 연결이 사용자 PC가 아니라 Anthropic
+서버에서 출발하므로 사내 방화벽 설정이 필요 없습니다.
 
-조직 공용 API 키 1개를 관리 설정(managed settings)에 함께 배포하면, 심사관은
+## 조직 일괄 배포 (IT 관리자, Claude Code) — 공용 키 1개, 사용자 제로 셋업
+
+조직 공용 API 키 1개를 관리 설정(managed settings)에 함께 배포하면, 사용자는
 아무것도 설정할 필요가 없습니다 (Claude Code 설치가 전부). 관리 설정의 `env`가
 모든 세션에 환경변수를 주입하므로 플러그인의 `${SKIPPER_API_KEY}` 참조가 자동으로
 채워집니다.
