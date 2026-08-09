@@ -6,77 +6,77 @@ Claude Code와 Claude 데스크탑 양쪽에서 쓸 수 있습니다.
 
 API 키는 SkipperLabs가 사용자별로 발급합니다 — support@skipperlabs.ai
 
-| 환경 | 얻는 것 | 설치 |
+| 환경 | 설치 방법 | 얻는 것 |
 |---|---|---|
-| **Claude Code** | MCP 도구 35종 + 스킬 4종 + `/skipper` 커맨드 | 아래 3줄 |
-| **Claude 데스크탑 / claude.ai** | MCP 도구 35종 | 커스텀 커넥터 URL 1개 |
+| **Claude Code** | 마켓플레이스 2줄 | MCP 도구 35종 + 스킬 4종 + `/skipper` 커맨드 |
+| **Claude 데스크탑 / Cowork** | 마켓플레이스 추가 (UI) | MCP 도구 35종 + 스킬 4종 |
+
+양쪽 다 이 저장소를 마켓플레이스로 등록해 설치합니다. API 키는 **플러그인을
+활성화할 때 Claude가 물어봅니다** — 미리 준비할 것은 없습니다.
 
 ---
 
-## Claude Code 설치 (3줄)
+## Claude Code 설치
 
 ```bash
-export SKIPPER_API_KEY=sk-skp-...                          # 발급받은 API 키 (셸 프로필에 추가 권장)
 claude plugin marketplace add hauteone/skipper-claude-plugins
 claude plugin install skipper@skipperlabs
 ```
 
-설치 후 Claude Code를 재시작하면 `skipper` MCP 서버(도구 35종), 스킬 4종,
-`/skipper` 커맨드가 활성화됩니다. 확인: `claude mcp list` 또는 대화에서
-`/skipper 삼성전자 주주 구성`으로 테스트.
+활성화 시 **SkipperLabs API 키**를 묻습니다. 입력하면 마스킹되어 macOS 키체인에
+저장됩니다 (`settings.json`에 평문으로 남지 않습니다).
+
+Claude Code를 재시작하면 `skipper` MCP 서버(도구 35종), 스킬 4종, `/skipper`
+커맨드가 활성화됩니다. 확인: `claude mcp list` 또는 `/skipper 삼성전자 주주 구성`.
+
+> 셸 환경변수 `SKIPPER_API_KEY`를 쓰던 기존 방식도 그대로 동작합니다. 키 입력을
+> 비워 두면 환경변수로 폴백합니다 (조직 일괄 배포용 — 아래 참조).
 
 ---
 
-## Claude 데스크탑 설치 (커스텀 커넥터)
+## Claude 데스크탑 / Cowork 설치
 
-데스크탑에는 플러그인을 설치하지 않습니다. 대신 MCP 서버를 **커스텀 커넥터**로
-연결하면 도구 35종을 그대로 쓸 수 있습니다.
-
-커넥터는 Claude 계정에 등록되므로 **claude.ai에서 한 번 추가하면 데스크탑 앱에도
-그대로 나타납니다** (앱과 웹이 같은 계정 설정을 공유).
-
-1. claude.ai 접속 → 설정 → **커넥터**(Connectors) → **커스텀 커넥터 추가**
-2. 이름에 `skipper`, URL에 아래를 넣습니다 — `sk-skp-...` 자리에 발급받은 키:
+1. Claude 데스크탑 → **Customize → Plugins → 마켓플레이스 추가**
+2. **저장소에서 추가**를 선택하고 아래를 입력:
 
    ```
-   https://api.skipperlabs.ai/mcp?apikey=sk-skp-...
+   hauteone/skipper-claude-plugins
    ```
 
-3. **추가**를 누르면 끝입니다. OAuth 설정(고급 설정)은 필요 없습니다.
-4. 대화창의 도구 목록에 `skipper`가 보이면 정상입니다.
-   `삼성전자 최대주주 지분율 알려줘`로 테스트하세요.
+3. 목록에 나타난 **skipper** 플러그인을 **설치**합니다.
+4. 활성화 시 **SkipperLabs API 키**를 묻습니다 — 발급받은 `sk-skp-...` 키를 입력하세요.
+5. 대화창에서 `삼성전자 최대주주 지분율 알려줘`로 확인합니다.
 
-**키를 URL에 넣는 이유**: 데스크탑 커스텀 커넥터는 커스텀 HTTP 헤더를 지원하지
-않아 `X-API-Key` 헤더를 넣을 수 없습니다. 그래서 API가 `?apikey=` 쿼리
-파라미터도 받도록 되어 있습니다. 다만 **키가 커넥터 설정에 URL로 저장되므로
-화면 공유나 스크린샷 시 노출에 주의**하세요. 키가 유출되면
-support@skipperlabs.ai 로 재발급을 요청하면 됩니다.
+**네트워크**: MCP 서버 연결은 사용자 PC가 아니라 Anthropic 서버에서 출발합니다.
+`api.skipperlabs.ai`는 공개 인터넷에 열려 있어 사내 방화벽 설정이 필요 없습니다.
 
-**네트워크**: 커넥터 연결은 사용자 PC가 아니라 Anthropic 서버에서 출발합니다.
-`api.skipperlabs.ai`는 공개 인터넷에 열려 있어 별도 방화벽 설정이 필요 없습니다.
+### 대안 — 커스텀 커넥터 (도구만 필요할 때)
+
+플러그인 없이 MCP 도구 35종만 쓰려면 커넥터로 붙일 수도 있습니다.
+claude.ai → 설정 → **커넥터** → **커스텀 커넥터 추가** → URL:
+
+```
+https://api.skipperlabs.ai/mcp?apikey=sk-skp-...
+```
+
+커스텀 커넥터는 HTTP 헤더를 지원하지 않아 키를 URL에 넣습니다. **키가 커넥터
+설정에 URL로 저장되므로 화면 공유·스크린샷 시 노출에 주의**하세요. 스킬은
+따라오지 않으므로, 특별한 이유가 없으면 위의 플러그인 설치를 권합니다.
 
 ### 데스크탑에서 달라지는 것
 
-MCP 도구 35종은 양쪽이 동일합니다. 나머지 구성요소는 이 저장소가 Claude Code
-플러그인 형식이라 그대로는 넘어가지 않습니다.
+MCP 도구 35종과 스킬은 양쪽 모두에서 동작합니다. 차이는 두 가지입니다.
 
-- **`/skipper` 커맨드와 `pe-research` 플레이북** — 플러그인으로 설치될 때만 자동
-  적용됩니다. 데스크탑에서는 자연어로 물어보면 되고, 도구는 동일하게 동작합니다.
-  플레이북 내용이 필요하면 `plugins/skipper/skills/pe-research/SKILL.md`를
-  커스텀 스킬로 올려 쓸 수 있습니다 (설정 → 스킬 → 스킬 만들기, ZIP 업로드).
-- **CSV 시트 생성 스킬 3종** — 데스크탑 커스텀 스킬로 그대로 올리는 것은 아직
-  지원하지 않습니다. 스킬이 번들한 파이썬 스크립트가 `${CLAUDE_PLUGIN_ROOT}`
-  경로와 `SKIPPER_API_KEY` 환경변수를 전제로 API를 직접 호출하는데, 데스크탑
-  스킬 실행 환경에는 그 두 가지가 없습니다.
+- **`/skipper` 커맨드** — 슬래시 커맨드는 Claude Code 형식입니다. 데스크탑에서는
+  그냥 자연어로 물어보면 되고, 도구와 플레이북은 동일하게 적용됩니다.
+- **CSV 시트 생성 스킬 3종** — 스킬 자체는 설치되지만, 번들된 파이썬 스크립트가
+  `${CLAUDE_PLUGIN_ROOT}` 경로와 로컬 파일 쓰기를 전제로 해서 데스크탑 실행
+  환경에서는 의도대로 동작하지 않습니다. 데스크탑에서 같은 시트가 필요하면
+  자연어로 요청하세요 (예: "SK 부문별 매출을 연도별·분기별 표로 만들어 CSV로 줘").
+  도구가 데이터를 가져오고 Claude가 파일을 만들어 줍니다.
 
-  데스크탑에서 같은 시트가 필요하면 커넥터를 붙인 상태에서 자연어로 요청하세요
-  (예: "SK 부문별 매출을 연도별·분기별 표로 만들어 CSV로 줘"). 도구가 데이터를
-  가져오고 Claude가 파일을 만들어 줍니다.
-
-> 커스텀 스킬 자체는 데스크탑·Cowork에서 지원됩니다(설정 → 스킬). 실행 가능한
-> 스크립트도 포함할 수 있습니다. 위 3종이 안 되는 것은 스킬 기능의 한계가 아니라
-> 이 스킬들이 Claude Code 전제로 작성됐기 때문입니다. 데스크탑용 변형을
-> 원하시면 support@skipperlabs.ai 로 알려주세요.
+> 훅과 서브에이전트는 Cowork에서만 실행되며 chat에서는 비활성으로 표시됩니다.
+> 이 플러그인은 둘 다 쓰지 않으므로 영향이 없습니다.
 
 ## 사용법 (Claude Code)
 
@@ -109,7 +109,8 @@ DART 이용 예시 워크북의 세 개 탭을 각각 CSV로 만들어 줍니다
 
 ```
 plugins/skipper/
-├── .mcp.json                          # 리모트 MCP: https://api.skipperlabs.ai/mcp (X-API-Key 인증)
+├── .claude-plugin/plugin.json         # 매니페스트 — userConfig로 API 키를 활성화 시 요청
+├── .mcp.json                          # 리모트 MCP: https://api.skipperlabs.ai/mcp
 ├── commands/skipper.md                # /skipper 커맨드 — 리서치 진입점 (플레이북·MCP 도구 강제)
 ├── scripts/                           # 시트 생성 스크립트 (표준 라이브러리만, 설치 불필요)
 │   ├── skipper_api.py                 #   공용 API 클라이언트
@@ -127,21 +128,43 @@ plugins/skipper/
 `SKIPPER_API_KEY`로 `https://api.skipperlabs.ai/api/v1/tools/{도구}`를 직접 호출해
 수 MB짜리 재무제표 응답을 대화 컨텍스트를 거치지 않고 파일로 떨굽니다.
 
-## API 키 설정 (Claude Code)
+## API 키 설정
 
-키는 셸 환경변수 `SKIPPER_API_KEY`로 입력합니다 — 플러그인의 MCP 설정이
-`${SKIPPER_API_KEY}`를 참조해 요청 헤더(`X-API-Key`)에 자동으로 넣습니다.
+키를 넣는 방법은 세 가지이고, 위에서부터 우선 적용됩니다.
+
+| 방법 | 대상 | 저장 위치 |
+|---|---|---|
+| **활성화 시 프롬프트** (기본) | Claude Code·데스크탑 | macOS 키체인 (마스킹 입력) |
+| 셸 환경변수 `SKIPPER_API_KEY` | Claude Code | 셸 프로필 |
+| 조직 관리 설정 | Claude Code 일괄 배포 | managed-settings.json |
+
+별도 준비 없이 플러그인을 설치하면 Claude가 키를 물어봅니다. 이 값은
+`sensitive`로 선언돼 있어 입력이 마스킹되고 `settings.json`에 평문으로 남지
+않습니다.
+
+셸 환경변수를 쓰던 기존 방식도 계속 동작합니다 — 프롬프트에서 키를 비워 두면
+환경변수로 폴백합니다.
 
 ```bash
 # 셸 프로필(~/.zshrc 또는 ~/.bashrc)에 한 줄 추가 후 터미널 재시작
 echo 'export SKIPPER_API_KEY=sk-skp-...' >> ~/.zshrc
 ```
 
-확인: Claude Code 대화창에서 `/mcp` 입력 → `skipper` 서버가 connected로 보이면
-정상입니다. 환경변수 없이 실행하면 서버 연결이 실패하니, 키를 넣은 뒤 Claude
-Code를 재시작하세요.
+확인: Claude Code에서 `/mcp` 입력 → `skipper` 서버가 connected로 보이면 정상입니다.
 
-데스크탑은 환경변수를 쓰지 않습니다 — 커넥터 URL의 `?apikey=`가 그 역할을 합니다.
+<details>
+<summary>동작 원리</summary>
+
+MCP 설정이 키를 두 경로로 동시에 넘깁니다.
+
+```json
+"url": "https://api.skipperlabs.ai/mcp?apikey=${user_config.api_key}",
+"headers": { "X-API-Key": "${SKIPPER_API_KEY}" }
+```
+
+API는 쿼리 파라미터를 먼저 보고, 비어 있으면 헤더로 폴백합니다. 그래서 프롬프트로
+받은 키와 환경변수 방식이 한 설정에서 함께 동작합니다.
+</details>
 
 ## 사내망 (GitHub 접근 불가 시, Claude Code)
 
