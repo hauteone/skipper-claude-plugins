@@ -1,7 +1,7 @@
 {
   "name": "skipper",
-  "description": "한국·미국 상장기업 리서치 — SkipperLabs MCP 도구 35종 + PE 심사 리서치 플레이북 + 실사 워크북 시트 생성 스킬 3종(Raw_BSPL·Raw_부문별매출·정리예시). SKIPPER_API_KEY 환경변수에 발급받은 API 키가 필요합니다.",
-  "version": "0.4.1",
+  "description": "한국·미국 상장기업 리서치 — SkipperLabs MCP 도구 35종 + 리서치 플레이북 + 실사 워크북 시트 생성 스킬 3종(Raw_BSPL·Raw_부문별매출·정리예시). 활성화 시 API 키를 물어봅니다 (Claude Code는 SKIPPER_API_KEY 환경변수도 가능).",
+  "version": "0.5.0",
   "author": {
     "name": "SkipperLabs",
     "email": "support@skipperlabs.ai"
@@ -14,5 +14,13 @@
     "disclosure",
     "research",
     "pe"
-  ]
+  ],
+  "userConfig": {
+    "api_key": {
+      "type": "string",
+      "title": "SkipperLabs API 키",
+      "description": "support@skipperlabs.ai 에서 발급받은 sk-skp- 로 시작하는 키. 비워 두면 SKIPPER_API_KEY 환경변수를 사용합니다 (Claude Code 전용).",
+      "sensitive": true
+    }
+  }
 }
