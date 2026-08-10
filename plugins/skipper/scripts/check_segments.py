@@ -10,11 +10,19 @@
   C2 매출 음수        매출은 음수일 수 없다
   C3 H1 + Q3 = 9M    서로 다른 보고서의 직접 태깅값끼리 맞아야 한다 (유도 무관)
   C4 ΣQ1..Q4 = FY    C3의 따름정리지만 유도 경로가 달라 따로 본다
-  C5 부문합 = 연결매출  손익계산서 매출과 대조한다. 초과분이 크면 부문 하나가 과대
+  C5 부문합 = 연결매출  손익계산서 매출과 대조한다. 크게 넘으면 한 부문의 수익
+                      성격이 나머지와 다르다는 신호다
   C6 표·부문 일관성    기간마다 표가 바뀌면 그 경계에서 증감률은 성립하지 않는다
 
-C5가 가장 강하다 — 부문 밖 독립 지표와 맞대므로, 표를 잘못 골라 한 부문이
-부풀었을 때 이것만 잡아낸다.
+C5가 가장 강하다 — 부문 밖 독립 지표와 맞대므로, 다른 검사가 전부 통과하는
+상황에서도 한 부문의 이상을 잡아낸다.
+
+C5 FAIL 은 '값이 틀렸다'는 뜻이 아니다. 지주회사는 부문 수익에 지분법이익이
+포함돼 정상적으로 크게 초과한다. SK(034730) 2026 1분기가 그 예로, 부문합이
+연결매출을 25.8% 넘지만 값 자체는 연결 주석과 정확히 일치한다 — SK스퀘어
+부문 수익 8.6조의 대부분이 SK하이닉스 지분법이익이다. 이런 부문을 '매출'로
+보고 비중을 계산하면 오독이므로, FAIL 은 '그 부문을 그대로 매출로 쓰지 말고
+수익 구성을 확인하라'로 읽어야 한다.
 
 사용:
   python3 check_segments.py 034730
@@ -33,9 +41,14 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from skipper_api import SkipperError, get_json, resolve, segments  # noqa: E402
 
 # 부문합이 연결매출을 넘을 수 있는 정상 범위. 부문 매출에는 내부거래가 포함되고
-# 연결매출은 그것을 제거한 뒤라, 부문합이 조금 큰 것은 정상이다. 크게 넘으면
-# 한 부문이 다른 기준(총액·상위 연결범위)으로 태깅됐다는 신호다.
+# 연결매출은 그것을 제거한 뒤라, 부문합이 조금 큰 것은 정상이다 (관측 +7.7~13.8%).
+# 크게 넘으면 한 부문의 수익 성격이 나머지와 다르다는 신호 — 지분법이익 포함,
+# 다른 연결범위, 총액 기준 태깅 등. 어느 쪽인지는 연결 주석을 열어야 갈린다.
 DEFAULT_TOLERANCE = 15.0  # %
+
+# 원인을 가르려면 여기를 본다. 부문 표의 정본이자 수익 성격이 각주로 붙는 곳이다.
+_C5_HINT = ("값 오류가 아닐 수 있다 — 연결재무제표 주석 '영업부문별 정보'에서 그 부문의 "
+            "수익 구성을 확인하라. 지주회사는 지분법이익이 섞여 정상적으로 초과한다.")
 
 
 def pct(a: float, b: float) -> float:
@@ -157,14 +170,15 @@ def check(symbol: str, name: str, year: int, tolerance: float) -> Report:
             rep.add("C5", "PASS", f"{period}: 부문합 {total/1e12:.1f}조 vs 연결 "
                                   f"{target/1e12:.1f}조 ({over:+.1f}%)")
             continue
-        # 어느 부문을 빼면 허용 범위에 들어오는지 짚는다 — 과대 태깅 후보.
+        # 어느 부문을 빼면 허용 범위에 들어오는지 짚는다 — 성격이 다른 부문 후보.
         suspect = ""
         for member, value in sorted(seg.items(), key=lambda kv: -kv[1]):
             if abs(pct(total - value, target)) <= tolerance:
-                suspect = f"  ← '{member}'({value/1e12:.1f}조) 제외 시 {pct(total-value, target):+.1f}%"
+                suspect = (f"  ← '{member}'({value/1e12:.1f}조) 제외 시 "
+                           f"{pct(total - value, target):+.1f}%")
                 break
         rep.add("C5", "FAIL", f"{period}: 부문합 {total/1e12:.1f}조 vs 연결 "
-                              f"{target/1e12:.1f}조 ({over:+.1f}%){suspect}")
+                              f"{target/1e12:.1f}조 ({over:+.1f}%){suspect}\n{_C5_HINT}")
 
     # C6 표·부문 집합 일관성
     roles = {g.get("roleKey") for g in groups_this_year.values() if g and g.get("roleKey")}
@@ -223,12 +237,18 @@ def main() -> None:
         failed += rep.failed
         print(f"{'='*74}\n[{mark}] {name} ({symbol})\n{'='*74}")
         for c, sev, msg in rep.findings:
-            print(f"  {sev:4} {c}  {msg}")
+            head, *rest = msg.split("\n")
+            print(f"  {sev:4} {c}  {head}")
+            for line in rest:
+                print(f"           {line}")
         if not rep.findings:
             print("  (검사 항목 없음)")
         print()
 
     print(f"요약: {len(targets)}종목 중 FAIL {failed}건")
+    if failed:
+        print("      FAIL 은 '값이 틀렸다'가 아니라 '그대로 쓰지 말고 확인하라'는 신호다.")
+        print("      지목된 부문의 수익 구성을 연결 주석 '영업부문별 정보'에서 확인하라.")
     raise SystemExit(1 if failed else 0)
 
 
