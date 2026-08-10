@@ -24,7 +24,7 @@ skipper MCP 서버(도구 35종)를 사용해 상장기업을 조사할 때 아�
 | 시장 전체 공시 스크리닝 (유상증자·CB·대량보유 등 "어떤 기업들이…") | `search_disclosures` | `get_document` |
 | 주주 기준 역탐색 (국민연금 보유 기업, A사의 타법인출자·계열) | `shareholder_screen` | `shareholders_detail` |
 | 재무제표·수익성·증감 분석 | `financial_statements` | `api_income_statement`, `api_ratios` |
-| 부문·지역·제품별 매출 추이 (연도별·분기별 표) | `segment_series` | `api_revenue_segments`(원천 직결), `segment_facts`, `get_document` |
+| 부문·지역·제품별 매출 추이 (연도별·분기별 표) | `api_revenue_segments`(원천 직결, 표·기준·기간을 하나로 좁혀 줌) | `segment_series`(보고서 원문 섹션 동봉), `segment_facts`, `get_document` |
 | 재무제표 주석 (우발부채·약정·특수관계자·충당부채) | `financial_notes` | `get_document` |
 | 배당 이력·배당성향 | `dividend_history` | `api_dividends` |
 | 특정 기업의 공시 목록 | `list_disclosures` | — |
@@ -48,9 +48,18 @@ skipper MCP 서버(도구 35종)를 사용해 상장기업을 조사할 때 아�
   **`api_revenue_segments`로 반드시 교차 확인하라** — `api_*` 도구는 원천 DB를 직접
   읽어 적재 지연의 영향을 받지 않는다. 두 경로가 모두 비었을 때만 "확인되지
   않는다"고 쓰고, 그 경우에도 "공시에 존재하지 않는다"로 단정하지 마라.
-- `api_revenue_segments`의 분기 조회(`period=H1|Q3`)는 같은 부문이 두 번 나온다 —
-  `durationType=ytd`(누적)와 `q3m`(3개월). 반드시 구분해 인용하고 둘을 합산하지
-  마라(이중계상). DART에 Q2·Q4 보고서는 없으므로 Q2는 H1에서, Q4는 FY에서 뺀다.
+- `api_revenue_segments`는 한 응답 안에서 부문명이 중복되지 않는다 — 연결/별도
+  (`fsDiv`), 표(`roleKey`), 기간을 서버가 하나로 좁혀 준다. `Q1~Q4`는 단일
+  3개월값, `H1`·`9M`이 누적이다. Q2·Q4는 유도값(`derived=true`)이며, 차감이
+  음수면 `amount=null`+`note`로 온다. 연도 간 시계열은 `name`이 아니라
+  `normalizedName`으로 이어라(발행사가 해마다 표기를 바꾼다).
+- `segment_series`·`segment_facts`의 `xbrl_facts`는 좁히지 않은 원자료다 — 같은
+  부문이 표(`role_key`)·기준(`fs_div`)별로 여러 줄 나온다. 시계열은 반드시 하나의
+  `role_key` 안에서만 구성하고, `duration_type`이 다른 값을 합산하지 마라(이중계상).
+- 부문 수치를 워크북·보고서에 싣기 전에 `check_segments.py`(플러그인 scripts/)로
+  정합성을 확인하라. 특히 부문합이 연결매출을 크게 넘으면(C5 FAIL) 그 부문에
+  지분법이익 등 영업외 수익이 섞였을 수 있다 — 지주회사에서 흔하다. 값이 맞아도
+  '매출'로 인용하면 오독이므로 연결 주석 '영업부문별 정보'에서 수익 구성을 확인한다.
 
 ## 2. 인용 규율 — 모든 수치에 출처와 기준을 단다
 
