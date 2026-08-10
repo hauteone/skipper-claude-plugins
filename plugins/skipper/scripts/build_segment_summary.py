@@ -5,9 +5,13 @@
   1. 연도별 매출액 및 비중 (단위: 백만원)
   2. 분기별 매출액 및 비중 (단위: 백만원, 단일분기 기준)
 
+부문 수치는 /api/v1/revenue-segments 에서 받는다. 서버가 연결/별도(fsDiv)·
+표(roleKey)·기간을 하나로 좁혀 주므로 한 부문이 한 번만 나오고, 단일분기(Q2·Q4)도
+서버가 누적에서 차감해 유도한다 — 여기서 다시 계산하지 않는다.
+
 2단계로 쓴다.
 
-  --draft  XBRL 부문 팩트로 초안 JSON을 만든다. 커버리지가 비면 null로 남긴다.
+  --draft  API 응답으로 초안 JSON을 만든다. 커버리지가 비면 null로 남긴다.
            (기업에 따라 XBRL 부문 매출이 없거나 연결 매출과 어긋난다. 초안은
            출발점일 뿐이고, 원문 '매출 및 수주상황' 표로 검증·보정해야 한다.)
   --data   보정된 JSON을 읽어 CSV를 만든다. 합계와 비중은 여기서 계산한다 —
@@ -29,25 +33,15 @@ from datetime import date
 from typing import Any
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from skipper_api import SkipperError, call, fail, resolve, write_csv  # noqa: E402
+from skipper_api import SkipperError, call, fail, resolve, segments, write_csv  # noqa: E402
 
 UNIT_DIVISOR = 1_000_000  # 원 → 백만원
 QUARTER_BY_MONTH = {"03": 1, "06": 2, "09": 3, "12": 4}
-# 정기보고서 종류 → 그 보고서가 끝내는 분기.
-REPORT_QUARTER = {"11013": 1, "11012": 2, "11014": 3, "11011": 4}
-
-
-def normalize_member(name: str) -> str:
-    """부문명 표기 흔들림을 흡수한다 ('SK이노베이션 계열' / 'SK이노베이션㈜' → 'SK이노베이션')."""
-    text = re.sub(r"\s+", " ", name or "").strip()
-    text = re.sub(r"(㈜|\(주\)|주식회사)", "", text)
-    text = re.sub(r"\s*계열$", "", text.strip())
-    return text.strip()
 
 
 def is_total(name: str) -> bool:
     """합계 행은 부문이 아니다 — 합계는 스크립트가 다시 계산한다."""
-    return normalize_member(name).replace(" ", "") in {"합계", "부문합계", "총계", "소계"}
+    return re.sub(r"\s+", "", name or "") in {"합계", "부문합계", "총계", "소계"}
 
 
 def quarter_labels(latest: tuple[int, int], count: int) -> list[str]:
@@ -85,127 +79,121 @@ def latest_quarter(ticker: str) -> tuple[int, int]:
     return today.year, max(1, (today.month - 1) // 3)
 
 
-def fetch_facts(ticker: str) -> list[dict[str, Any]]:
-    """부문 매출 팩트 — segment_series 우선, 없으면 segment_facts."""
+def collect(ticker: str, period: str, limit: int) -> tuple[dict[tuple[str, int], dict], list[dict]]:
+    """한 기간 토큰을 조회해 {(정규화부문명, 연도): item}과 연도별 메타를 돌려준다.
+
+    조인 키는 name이 아니라 normalizedName이다 — 발행사가 해마다 표기를 바꾸므로
+    ('카카오' ↔ '㈜카카오') name으로 이으면 한 부문이 두 줄로 갈린다.
+    """
+    store: dict[tuple[str, int], dict] = {}
+    meta: list[dict] = []
     try:
-        data = call("segment_series", query=ticker, years=5, quarters=5)
-        return (data.get("xbrl_facts") or {}).get("rows") or []
-    except SkipperError:
+        groups = segments(ticker, period=period, limit=limit)
+    except SkipperError as exc:
+        print(f"  {period} 조회 실패: {exc}", file=sys.stderr)
+        return store, meta
+    for group in groups:
         try:
-            return (call("segment_facts", query=ticker) or {}).get("rows") or []
-        except SkipperError:
-            return []
-
-
-def index_facts(facts: list[dict[str, Any]]) -> dict[tuple[str, int, int], dict[str, int]]:
-    """부문 매출 팩트를 (부문, 사업연도, 분기) → {기간유형: 백만원}으로 색인한다."""
-    store: dict[tuple[str, int, int], dict[str, int]] = {}
-    for fact in facts:
-        if fact.get("axis_type") != "segment" or fact.get("metric") != "revenue":
-            continue
-        if is_total(fact.get("member", "")):
-            continue
-        amount = fact.get("amount")
-        quarter = REPORT_QUARTER.get(str(fact.get("reprt_code") or ""))
-        try:
-            year = int(fact.get("bsns_year") or 0)
+            year = int(group.get("calendarYear") or 0)
         except (TypeError, ValueError):
             continue
-        if not year or not quarter or not isinstance(amount, (int, float)):
+        if not year:
             continue
-        duration = fact.get("duration_type") or ("fy" if quarter == 4 else "ytd")
-        key = (normalize_member(fact.get("member", "")), year, quarter)
-        store.setdefault(key, {})[duration] = round(amount / UNIT_DIVISOR)
-    return store
+        meta.append({
+            "year": year,
+            "period": group.get("period") or period,
+            "roleKey": group.get("roleKey") or "",
+            "fsDiv": group.get("fsDiv") or "",
+        })
+        for item in group.get("items") or []:
+            name = item.get("name") or ""
+            if is_total(name):
+                continue
+            store[(item.get("normalizedName") or name, year)] = item
+    return store, meta
 
 
-def cumulative(store: dict, member: str, year: int, quarter: int) -> int | None:
-    """해당 분기까지의 누적 매출. 1분기는 누적과 단일이 같다."""
-    cell = store.get((member, year, quarter)) or {}
-    if "ytd" in cell:
-        return cell["ytd"]
-    if quarter == 4 and "fy" in cell:
-        return cell["fy"]
-    if quarter == 1 and "q3m" in cell:
-        return cell["q3m"]
-    return None
+def to_mn(item: dict | None) -> int | None:
+    """금액을 백만원으로. 서버가 유도에 실패하면 amount가 null이므로 그대로 비운다."""
+    amount = (item or {}).get("amount")
+    return round(amount / UNIT_DIVISOR) if isinstance(amount, (int, float)) else None
 
 
-def single_quarter(store: dict, member: str, year: int, quarter: int) -> tuple[int | None, str]:
-    """단일분기 매출과 그 출처. 3개월 팩트가 있으면 그 값, 없으면 누적 차감.
-
-    반기보고서는 상반기 누적, 3분기보고서는 9개월 누적, 사업보고서는 연간이라
-    그대로 쓰면 분기 표가 부풀어 오른다.
-
-    차감 결과가 음수면 버린다. 매출은 음수일 수 없으므로, 음수는 두 보고서의
-    부문 표가 서로 다른 범위로 태깅됐다는 신호다 (지주회사에서 흔하다). 그런
-    값을 그대로 내보내면 워크북에 -59조 같은 수치가 그대로 박힌다.
-    """
-    cell = store.get((member, year, quarter)) or {}
-    if "q3m" in cell:
-        return cell["q3m"], "q3m"
-    current = cumulative(store, member, year, quarter)
-    if current is None:
-        return None, "none"
-    if quarter == 1:
-        return current, "q3m"
-    previous = cumulative(store, member, year, quarter - 1)
-    if previous is None:
-        return None, "none"
-    value = current - previous
-    if value < 0:
-        return None, "rejected"
-    return value, "derived"
+def display_names(stores: list[dict[tuple, dict]]) -> dict[str, str]:
+    """정규화부문명 → 표시명 (가장 최근 연도의 공시 표기)."""
+    best: dict[str, tuple[int, str]] = {}
+    for store in stores:
+        for key, item in store.items():
+            norm, year = key[0], key[1]
+            if norm not in best or year > best[norm][0]:
+                best[norm] = (year, item.get("name") or norm)
+    return {norm: label for norm, (_, label) in best.items()}
 
 
-def build_draft(company: dict[str, str], facts: list[dict[str, Any]],
-                years: int, quarters: int) -> tuple[dict[str, Any], dict[str, int]]:
-    """XBRL 팩트로 초안을 만든다. 커버 밖 칸은 null로 남겨 보정 대상임을 드러낸다."""
-    store = index_facts(facts)
-    members = sorted({key[0] for key in store})
+def build_draft(company: dict[str, str], years: int,
+                quarters: int) -> tuple[dict[str, Any], dict[str, Any]]:
+    """API 응답으로 초안을 만든다. 커버 밖 칸은 null로 남겨 보정 대상임을 드러낸다."""
+    ticker = company["ticker"]
 
-    fact_years = sorted({key[1] for key in store if "fy" in store[key]})
+    annual_store, metas = collect(ticker, "FY", years + 1)
+
+    quarter_periods = quarter_labels(latest_quarter(ticker), quarters)
+    parsed = [parse_quarter_label(label) for label in quarter_periods]
+    span = max(y for y, _ in parsed) - min(y for y, _ in parsed) + 2
+    quarter_store: dict[tuple[str, int, int], dict] = {}
+    for slot in sorted({q for _, q in parsed}):
+        store, meta = collect(ticker, f"Q{slot}", span)
+        metas.extend(meta)
+        for (norm, year), item in store.items():
+            quarter_store[(norm, year, slot)] = item
+
+    labels = display_names([annual_store, quarter_store])
+
+    fact_years = sorted({year for _, year in annual_store})
     last_year = fact_years[-1] if fact_years else date.today().year - 1
     annual_periods = [str(last_year - i) for i in range(years - 1, -1, -1)]
-    annual = {
-        member: [(store.get((member, int(year), 4)) or {}).get("fy") for year in annual_periods]
-        for member in members
-    }
 
-    quarter_periods = quarter_labels(latest_quarter(company["ticker"]), quarters)
-    parsed = [parse_quarter_label(label) for label in quarter_periods]
+    annual: dict[str, list[Any]] = {}
     quarterly: dict[str, list[Any]] = {}
-    rejected = 0
-    for member in members:
-        row: list[Any] = []
-        for year, quarter in parsed:
-            value, provenance = single_quarter(store, member, year, quarter)
-            rejected += provenance == "rejected"
-            row.append(value)
-        quarterly[member] = row
+    for norm in sorted(labels):
+        label = labels[norm]
+        annual[label] = [to_mn(annual_store.get((norm, int(y)))) for y in annual_periods]
+        quarterly[label] = [to_mn(quarter_store.get((norm, y, q))) for y, q in parsed]
+
+    derived = sum(1 for i in quarter_store.values() if i.get("derived"))
+    rejected = sum(1 for i in quarter_store.values()
+                   if i.get("note") == "negative_derivation")
+    role_keys = sorted({m["roleKey"] for m in metas if m["roleKey"]})
+    fs_divs = sorted({m["fsDiv"] for m in metas if m["fsDiv"]})
 
     draft = {
         "company": company["name"],
-        "ticker": company["ticker"],
+        "ticker": ticker,
         "unit": "백만원",
         "annual": {"periods": annual_periods, "segments": annual},
         "quarterly": {"periods": quarter_periods, "segments": quarterly},
         "sources": [],
+        "provenance": {
+            "endpoint": "GET /api/v1/revenue-segments (iceberg 원천)",
+            "fsDiv": fs_divs,
+            "roleKeys": role_keys,
+        },
         "_주의": (
-            "XBRL 부문 팩트로 만든 초안입니다. 분기 값은 3개월 팩트가 있으면 그 값을, "
-            "없으면 누적에서 직전 누적을 빼 단일분기로 환산했습니다. 정기보고서의 "
-            "'4. 매출 및 수주상황' / '2. 주요 제품 및 서비스' 표와 대조해 검증하고, "
-            "부문 구분이 다르면 원문을 따르세요. 합계와 비중은 렌더링 단계에서 "
-            "계산하므로 넣지 마십시오."
+            "XBRL 부문 팩트로 만든 초안입니다. 분기 값은 단일분기 기준이며 Q2·Q4는 "
+            "서버가 누적에서 차감해 유도한 값입니다. 정기보고서의 '4. 매출 및 수주상황' / "
+            "'2. 주요 제품 및 서비스' 표와 대조해 검증하고, 부문 구분이 다르면 원문을 "
+            "따르세요. 합계와 비중은 렌더링 단계에서 계산하므로 넣지 마십시오."
         ),
     }
-    return draft, {"rejected": rejected}
+    stats = {"derived": derived, "rejected": rejected,
+             "role_keys": role_keys, "fs_divs": fs_divs}
+    return draft, stats
 
 
 def table_rows(company: str, title: str, block: dict[str, Any]) -> list[list[Any]]:
     """표 하나 — 부문별 매출액, 합계, 부문별 비중."""
     periods = block.get("periods") or []
-    segments = block.get("segments") or {}
+    segments_map = block.get("segments") or {}
     rows: list[list[Any]] = [[title], ["구분", *periods]]
 
     # 한 부문이라도 값이 비면 그 기간의 합계·비중은 내지 않는다 — 부분합을 합계로
@@ -213,20 +201,20 @@ def table_rows(company: str, title: str, block: dict[str, Any]) -> list[list[Any
     # 모르는 값만 null로 남긴다.
     totals: list[float | None] = []
     for index in range(len(periods)):
-        values = [v[index] if index < len(v) else None for v in segments.values()]
+        values = [v[index] if index < len(v) else None for v in segments_map.values()]
         if values and all(isinstance(v, (int, float)) for v in values):
             totals.append(sum(values))
         else:
             totals.append(None)
 
-    for member, values in segments.items():
+    for member, values in segments_map.items():
         padded = list(values) + [None] * (len(periods) - len(values))
         rows.append([f"{company} {member} 매출액",
                      *["" if v is None else v for v in padded]])
 
     rows.append(["합계", *["" if t is None else round(t) for t in totals]])
 
-    for member, values in segments.items():
+    for member, values in segments_map.items():
         padded = list(values) + [None] * (len(periods) - len(values))
         share: list[Any] = []
         for index, value in enumerate(padded):
@@ -297,12 +285,11 @@ def main() -> None:
         fail(str(exc))
         return
 
-    facts = fetch_facts(company["ticker"])
-    draft, stats = build_draft(company, facts, args.years, args.quarters)
+    draft, stats = build_draft(company, args.years, args.quarters)
     with open(args.draft, "w", encoding="utf-8") as fh:
         json.dump(draft, fh, ensure_ascii=False, indent=2)
 
-    segments = draft["annual"]["segments"]
+    members = draft["annual"]["segments"]
 
     def filled(block: str) -> tuple[int, int]:
         values = [v for row in draft[block]["segments"].values() for v in row]
@@ -316,9 +303,9 @@ def main() -> None:
     print(f"연도별 기간: {', '.join(draft['annual']['periods'])}  "
           f"→ {annual_filled}/{annual_total}칸 채움")
     print(f"분기별 기간: {', '.join(draft['quarterly']['periods'])}  "
-          f"→ {quarter_filled}/{quarter_total}칸 채움 (단일분기 환산 적용)")
-    if segments:
-        print(f"부문 후보 {len(segments)}개: " + ", ".join(segments))
+          f"→ {quarter_filled}/{quarter_total}칸 채움 (단일분기 기준)")
+    if members:
+        print(f"부문 후보 {len(members)}개: " + ", ".join(members))
     else:
         # 0행은 "이 기업에 부문 공시가 없다"가 아니다 — 팩트 적재가 아직 안 됐을 수도
         # 있다. 둘을 구분할 수 없으므로 단정하지 않고 원문 확인으로 넘긴다.
@@ -326,11 +313,25 @@ def main() -> None:
         print("      부문 공시가 없는 기업일 수도, 팩트가 아직 적재되지 않은 것일 수도")
         print("      있습니다. 원문 '4. 매출 및 수주상황' 표를 열어 직접 확인하세요.")
 
+    if stats["fs_divs"]:
+        print(f"기준: {', '.join(stats['fs_divs'])}  "
+              f"표: {', '.join(k[:46] for k in stats['role_keys']) or '(미기록)'}")
+    if stats["derived"]:
+        print(f"단일분기 유도값 {stats['derived']}칸 (Q2=반기−1Q, Q4=연간−3분기누적).")
+
+    # 표가 둘 이상이면 시계열이 표를 넘나든 것이다 — 표마다 같은 부문의 금액이
+    # 달라 증감률이 그대로 오독된다. 값을 지우지는 않되 반드시 드러낸다.
+    if len(stats["role_keys"]) > 1:
+        print(f"\n경고: 기간에 따라 서로 다른 표가 채택됐습니다 ({len(stats['role_keys'])}종).")
+        for key in stats["role_keys"]:
+            print(f"      - {key}")
+        print("      표마다 같은 부문의 금액이 다릅니다. 표가 바뀐 경계에서 증감률을")
+        print("      해석하지 말고, 원문 '4. 매출 및 수주상황' 표로 연결성을 확인하세요.")
+
     if stats["rejected"]:
-        print(f"\n경고: 누적 차감 결과가 음수라 폐기한 칸이 {stats['rejected']}개입니다.")
+        print(f"\n경고: 차감 결과가 음수라 서버가 폐기한 칸이 {stats['rejected']}개입니다.")
         print("      보고서마다 부문 표의 범위가 다르게 태깅됐다는 뜻입니다 (지주회사에서 흔함).")
-        print("      이 기업의 분기 표는 XBRL로 만들 수 없습니다 — 원문 '4. 매출 및 수주상황'")
-        print("      표에서 직접 읽어 채우세요. 남아 있는 분기 값도 같은 이유로 의심해야 합니다.")
+        print("      해당 분기는 원문 '4. 매출 및 수주상황' 표에서 직접 읽어 채우세요.")
 
     print("\n다음: 정기보고서 '4. 매출 및 수주상황' 표와 대조해 검증·보정한 뒤 --data 로 렌더링하세요.")
 
