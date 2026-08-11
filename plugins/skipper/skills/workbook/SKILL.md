@@ -51,12 +51,24 @@ Raw_BSPL의 권장 경로(MCP로 가져와 `--from-json`)는 자격증명이 전
 
 - `SKIPPER_API_KEY` — 정적 키(만료 없음, 반복 실행에 권장).
   `support@skipperlabs.ai`에서 발급.
-- `SKIPPER_ACCESS_TOKEN` — MCP 커넥터와 같은 계정의 OAuth 액세스 토큰(만료됨).
+- `SKIPPER_ACCESS_TOKEN` — 단기 액세스 토큰(만료됨). MCP 커넥터가 연결돼
+  있으면 `mint_script_token` 도구로 즉시 발급받을 수 있다.
   `SKIPPER_API_KEY`가 있으면 무시된다.
 
-`... 환경변수가 비어 있습니다`가 나오면: Raw_BSPL은 `--from-json` 경로로
-바꾸고, Raw_부문별매출은 키 설정(`export SKIPPER_API_KEY="sk-skp-..."`)을
-안내한다.
+`... 환경변수가 비어 있습니다`가 나오면 순서대로 시도한다:
+
+1. Raw_BSPL은 `--from-json` 경로로 바꾼다 (자격증명 자체가 불필요).
+2. MCP 커넥터가 연결돼 있으면 `mint_script_token` 도구를 호출해 `accessToken`을
+   받고, **스크립트 실행과 같은 Bash 명령 안에서** 넘긴다:
+
+   ```bash
+   SKIPPER_ACCESS_TOKEN="<accessToken>" python3 "${CLAUDE_PLUGIN_ROOT}/scripts/build_raw_segment.py" ...
+   ```
+
+   별도 명령으로 `export`하면 다음 Bash 호출에 이어지지 않는다 — 반드시 같은
+   명령 줄에 붙인다. 실행 중 `인증 실패 (401)`이 나오면 토큰이 만료된 것이니
+   `mint_script_token`을 다시 호출해 새 토큰으로 재시도한다.
+3. 둘 다 안 되면 정적 키 설정(`export SKIPPER_API_KEY="sk-skp-..."`)을 안내한다.
 
 ## 공통 실패 처리
 

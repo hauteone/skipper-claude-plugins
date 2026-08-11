@@ -5,8 +5,8 @@
 
 필요 환경변수 (둘 중 하나):
   SKIPPER_API_KEY      발급받은 정적 API 키 (만료 없음 — 반복 실행에 권장)
-  SKIPPER_ACCESS_TOKEN MCP 커넥터와 같은 계정의 OAuth 액세스 토큰 (만료됨).
-                        SKIPPER_API_KEY가 있으면 이 값은 무시된다.
+  SKIPPER_ACCESS_TOKEN 단기 액세스 토큰 (만료됨). MCP의 mint_script_token 도구로
+                        발급받는다. SKIPPER_API_KEY가 있으면 이 값은 무시된다.
   SKIPPER_API_URL      기본값 https://api.skipperlabs.ai
 
 개발용 우회 (SkipperLabs 내부 전용): SKIPPER_GRAPH_URL과 SKIPPER_INTERNAL_TOKEN이
@@ -29,9 +29,11 @@ DEFAULT_TIMEOUT = 180
 
 _NO_KEY_MESSAGE = (
     "SKIPPER_API_KEY 또는 SKIPPER_ACCESS_TOKEN 환경변수가 비어 있습니다. "
-    "둘 중 하나를 셸에 설정하세요:\n"
+    "둘 중 하나를 설정하세요:\n"
     '  export SKIPPER_API_KEY="sk-skp-..."      # 정적 키 (권장 — 만료 없음)\n'
-    '  export SKIPPER_ACCESS_TOKEN="..."        # OAuth 액세스 토큰 (MCP 커넥터와 동일 계정, 만료됨)\n'
+    '  export SKIPPER_ACCESS_TOKEN="..."        # 단기 토큰 (mint_script_token MCP 도구로 발급, 만료됨)\n'
+    "MCP 커넥터가 이미 연결돼 있다면 mint_script_token 도구를 호출해 accessToken을 받고,\n"
+    '스크립트 실행과 같은 셸 명령 안에서 SKIPPER_ACCESS_TOKEN="<값>" 으로 함께 넘기면 됩니다.\n'
     "키 발급 문의: support@skipperlabs.ai"
 )
 
@@ -90,7 +92,9 @@ def _fetch(req: urllib.request.Request, label: str, timeout: int) -> Any:
         detail = exc.read().decode("utf-8", "replace")[:400]
         if exc.code == 401:
             raise SkipperError(
-                f"인증 실패 (401) — SKIPPER_API_KEY 또는 SKIPPER_ACCESS_TOKEN을 확인하세요. 응답: {detail}"
+                f"인증 실패 (401) — SKIPPER_API_KEY 또는 SKIPPER_ACCESS_TOKEN을 확인하세요. "
+                f"SKIPPER_ACCESS_TOKEN은 단기 토큰이라 만료됩니다 — mint_script_token MCP 도구를 "
+                f"다시 호출해 새 accessToken을 받아 재시도하세요. 응답: {detail}"
             ) from exc
         raise SkipperError(f"{label} 호출 실패 (HTTP {exc.code}): {detail}") from exc
     except urllib.error.URLError as exc:

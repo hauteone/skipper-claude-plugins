@@ -175,3 +175,9 @@ python3 "${CLAUDE_PLUGIN_ROOT}/scripts/build_segment_summary.py" "<회사명>" -
 - `--draft 또는 --data 중 하나를 지정하세요` → 1단계부터 다시 한다.
 - 초안의 부문 후보가 0개여도 정상이다. 그 기업은 XBRL 부문 태깅이 없다는 뜻이므로
   2단계에서 원문 표만으로 부문을 정의해 채운다.
+- `... 환경변수가 비어 있습니다` 또는 `인증 실패 (401)` → MCP 커넥터가 연결돼
+  있으면 `mint_script_token` 도구로 `accessToken`을 받아, **스크립트 실행과 같은
+  Bash 명령 안에서** `SKIPPER_ACCESS_TOKEN="<값>" python3 ...` 형태로 넘긴다
+  (별도 `export`는 다음 Bash 호출에 이어지지 않는다). 401은 토큰 만료 신호이므로
+  같은 도구로 새 토큰을 받아 재시도한다. 커넥터가 없으면 정적 키
+  (`export SKIPPER_API_KEY="sk-skp-..."`) 설정을 안내한다.
