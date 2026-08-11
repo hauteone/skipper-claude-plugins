@@ -34,7 +34,7 @@ claude plugin install skipper@skipperlabs
 echo 'export SKIPPER_API_KEY=sk-skp-...' >> ~/.zshrc   # 기존 환경변수 방식도 그대로 동작
 ```
 
-재시작하면 `skipper` MCP 서버(도구 35종), 스킬 5종, `/skipper` 커맨드가
+재시작하면 `skipper` MCP 서버(도구 35종), 스킬 3종, `/skipper` 커맨드가
 활성화됩니다. 확인: `claude mcp list` 또는 `/skipper 삼성전자 주주 구성`.
 
 ### 자동 업데이트 켜기 (권장)
@@ -101,7 +101,7 @@ MCP 인가 명세도 쿼리스트링 토큰을 금지하므로, 위의 OAuth 방
 | 항목 | 데스크탑 | Claude Code |
 |---|---|---|
 | 플러그인만 설치했을 때 도구 | **안 잡힘** — 커넥터 필요 | 자동 연결 |
-| 스킬 | 4종 (`skills/`만) | 5종 (`commands/` 포함) |
+| 스킬 | 3종 (`skills/`만) | 4종 (`commands/` 포함) |
 | `userConfig` API 키 설정 | 설정 UI 없음 (커넥터 OAuth로 대체) | `/plugin configure` |
 
 도구가 안 잡히는 직접 원인은 **키를 넣을 곳이 없어서**입니다. 데스크탑에는
@@ -112,7 +112,7 @@ MCP 인가 명세도 쿼리스트링 토큰을 금지하므로, 위의 OAuth 방
 - **`/skipper` 커맨드** — `commands/` 항목은 데스크탑 스킬 목록에 나타나지
   않습니다. 자연어로 물어보면 되고, 도구는 동일하게 동작합니다. 플레이북이
   필요하면 `pe-research` 스킬을 직접 지정하세요.
-- **CSV 시트 생성 스킬 3종** — 스킬 자체는 설치되지만, 번들된 파이썬 스크립트가
+- **CSV 시트 생성 스킬(workbook·segment-summary)** — 스킬 자체는 설치되지만, 번들된 파이썬 스크립트가
   `${CLAUDE_PLUGIN_ROOT}` 경로와 로컬 파일 쓰기를 전제로 해서 데스크탑 실행
   환경에서는 의도대로 동작하지 않습니다. 데스크탑에서 같은 시트가 필요하면
   자연어로 요청하세요 (예: "SK 부문별 매출을 연도별·분기별 표로 만들어 CSV로 줘").
@@ -132,18 +132,20 @@ MCP 인가 명세도 쿼리스트링 토큰을 금지하므로, 위의 OAuth 방
 
 데스크탑에서는 `/skipper` 없이 자연어로 물어보면 됩니다 — 같은 도구를 씁니다.
 
-### 실사 워크북 시트 만들기 — 스킬 3종
+### 실사 워크북 시트 만들기 — workbook · segment-summary
 
-DART 이용 예시 워크북의 세 개 탭을 각각 CSV로 만들어 줍니다. UTF-8 BOM으로 써서
-엑셀에서 더블클릭하면 한글이 깨지지 않고 바로 열립니다.
+DART 이용 예시 워크북의 세 개 탭을 CSV로 만들어 줍니다. UTF-8 BOM으로 써서
+엑셀에서 더블클릭하면 한글이 깨지지 않고 바로 열립니다. 리서치(`/skipper`) 중
+재무제표·부문 데이터가 화제가 되면 시트로 만들어드릴지 먼저 제안하고, 수락하면
+생성합니다. 직접 호출할 수도 있습니다:
 
 | 커맨드 | 만드는 시트 | 내용 |
 |---|---|---|
-| `/skipper:raw-bspl <회사>` | Raw_BSPL | 정기보고서별 연결재무제표 4표(재무상태표·포괄손익·자본변동·현금흐름)를 보고서 단위 열 블록으로 |
-| `/skipper:raw-segment <회사>` | Raw_부문별매출 | 정기보고서별 "주요 제품 및 서비스" 원문 + XBRL 부문 팩트 표 |
+| `/skipper:workbook <회사> 재무제표` | Raw_BSPL | 정기보고서별 연결재무제표 4표(재무상태표·포괄손익·자본변동·현금흐름)를 보고서 단위 열 블록으로 |
+| `/skipper:workbook <회사> 부문` | Raw_부문별매출 | 정기보고서별 "주요 제품 및 서비스" 원문 + XBRL 부문 팩트 표 |
 | `/skipper:segment-summary <회사>` | 정리예시 | 연도별·분기별 부문 매출액과 비중 (합계·비중 자동 계산) |
 
-예: `/skipper:raw-bspl SK`, `/skipper:raw-bspl 034730 --reports 6 --unit 억원`
+예: `/skipper:workbook SK 연결재무제표`, `/skipper:workbook 034730 재무제표 6개 보고서 억원 단위`
 
 `segment-summary`는 초안을 만든 뒤 공시 원문 표로 검증·보정해 렌더링하는 2단계로
 동작합니다 — XBRL 부문 매출만으로는 분기 표가 채워지지 않는 기업이 많기 때문입니다.
@@ -161,10 +163,11 @@ plugins/skipper/
 │   ├── build_raw_segment.py
 │   └── build_segment_summary.py
 └── skills/
-    ├── pe-research/SKILL.md           # 리서치 플레이북 (도구 라우팅·인용 규율)
-    ├── raw-bspl/SKILL.md              # /skipper:raw-bspl
-    ├── raw-segment/SKILL.md           # /skipper:raw-segment
-    └── segment-summary/SKILL.md       # /skipper:segment-summary
+    ├── pe-research/SKILL.md           # 리서치 플레이북 (도구 라우팅·인용 규율·워크북 제안)
+    ├── workbook/                      # /skipper:workbook — Raw_BSPL·Raw_부문별매출 시트
+    │   ├── SKILL.md                   #   진입·시트 선택·공통 환경/인증/실패 처리
+    │   └── references/                #   시트별 상세 절차 (raw-bspl.md, raw-segment.md)
+    └── segment-summary/SKILL.md       # /skipper:segment-summary — 정리예시 시트
 ```
 
 시트 생성 스크립트는 Python 3.9+ 표준 라이브러리만 씁니다 (`pip install` 불필요).

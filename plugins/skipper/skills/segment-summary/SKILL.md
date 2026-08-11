@@ -114,8 +114,8 @@ get_document(rcept_no='<접수번호>', section='연결재무제표 주석')
 
 1. `list_disclosures(ticker, category='정기공시')`로 대상 보고서를 잡는다.
 2. 각 보고서에 `get_document(rcept_no, section='매출')`로 "4. 매출 및 수주상황"
-   표를 연다. 여기 없으면 `section='주요 제품'`을 본다. `skipper:raw-segment`를
-   먼저 돌렸다면 그 CSV에 두 섹션이 이미 들어 있다.
+   표를 연다. 여기 없으면 `section='주요 제품'`을 본다. `skipper:workbook`으로
+   Raw_부문별매출 시트를 먼저 만들었다면 그 CSV에 두 섹션이 이미 들어 있다.
 3. 표의 **부문 구분이 초안의 부문 후보와 다르면 원문을 따른다.** 초안의 부문명은
    XBRL 태그에서 왔는데, 이게 회사가 쓰는 사업부문과 아예 다른 표인 경우가 있다 —
    SK(주)는 원문이 투자부문·사업부문 2개인데 XBRL 멤버는 SK이노베이션·SK텔레콤 같은

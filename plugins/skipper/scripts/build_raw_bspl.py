@@ -159,16 +159,32 @@ def main() -> None:
     parser.add_argument("--statements", default="BS,CIS,SCE,CF",
                         help="포함할 재무제표 (BS,CIS,SCE,CF 중 콤마 구분)")
     parser.add_argument("--out", default=None, help="출력 CSV 경로")
+    parser.add_argument("--from-json", default=None,
+                        help="fs_reports 도구 응답 JSON 파일 경로 ('-'면 표준입력). 주면 "
+                             "네트워크를 전혀 쓰지 않는다 — SKIPPER_API_KEY/SKIPPER_ACCESS_TOKEN도 "
+                             "필요 없다. 에이전트가 MCP로 fs_reports를 직접 호출해 받은 응답을 "
+                             "그대로 넘기는 용도다.")
     args = parser.parse_args()
 
     wanted = [s.strip().upper() for s in args.statements.split(",") if s.strip()]
     divisor = UNITS[args.unit]
 
-    try:
-        data = call("fs_reports", query=args.company)
-    except SkipperError as exc:
-        fail(str(exc))
-        return
+    if args.from_json:
+        raw = sys.stdin.read() if args.from_json == "-" else open(args.from_json, encoding="utf-8").read()
+        try:
+            data = json.loads(raw)
+        except ValueError as exc:
+            fail(f"--from-json 내용이 JSON이 아닙니다: {exc}")
+            return
+        if isinstance(data, dict) and data.get("error"):
+            fail(str(data["error"]))
+            return
+    else:
+        try:
+            data = call("fs_reports", query=args.company)
+        except SkipperError as exc:
+            fail(str(exc))
+            return
 
     company = (data.get("company") or {}).get("name") or args.company
     reports = [r for r in data.get("reports") or [] if r.get("accounts")]
