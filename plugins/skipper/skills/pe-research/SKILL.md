@@ -2,14 +2,15 @@
 name: pe-research
 description: >
   한국·미국 상장기업 리서치와 PE 심사 실무 플레이북. 기업의 지분 구조, 공시 이력,
-  재무 검증, 배당, 시장 전체 공시 스크리닝 질문에 사용한다. skipper MCP 도구
-  35종의 라우팅 전략과 인용 규율을 담고 있다. Use when researching Korean or US
-  listed companies — shareholders, disclosures, financials, dividends, deal screening.
+  재무 검증, 배당, 증권사 리포트, 시장 전체 공시 스크리닝 질문에 사용한다.
+  skipper MCP 도구의 라우팅 전략과 인용 규율을 담고 있다. Use when researching
+  Korean or US listed companies — shareholders, disclosures, financials,
+  dividends, analyst reports, deal screening.
 ---
 
 # skipper PE 심사 리서치 플레이북
 
-skipper MCP 서버(도구 35종)를 사용해 상장기업을 조사할 때 아래 규율을 따른다.
+skipper MCP 서버를 사용해 상장기업을 조사할 때 아래 규율을 따른다.
 이 플레이북은 korean-dart-mcp 대비 블라인드 비교 평가(20문항)에서 검증된 도구
 전략·답변 규칙을 담고 있다.
 
@@ -29,6 +30,7 @@ skipper MCP 서버(도구 35종)를 사용해 상장기업을 조사할 때 아�
 | 배당 이력·배당성향 | `dividend_history` | `api_dividends` |
 | 특정 기업의 공시 목록 | `list_disclosures` | — |
 | 공시 원문 정독 | `get_document` (대형 문서는 `section=` 정조준) | — |
+| 증권사 리포트 — 애널리스트 분석·목표주가 근거·실적 추정·산업 전망 | `search_research` (`code`로 종목 제한, `days`로 기간 제한, `broker`로 증권사 필터) | `get_research_report` (`report_id` 전문, `pages`로 특정 페이지) |
 | 뉴스·이벤트·정성 질문 | `hybrid_search` | `list_disclosures`로 교차 검증 |
 | 집계·순위·관계 탐색 (그래프 구조 질문) | `graph_query` | — |
 | 시세·수급·ETF·컨센서스·스크리너 | `api_*` 정형 데이터 도구 | — |
@@ -56,6 +58,10 @@ skipper MCP 서버(도구 35종)를 사용해 상장기업을 조사할 때 아�
 - `segment_series`·`segment_facts`의 `xbrl_facts`는 좁히지 않은 원자료다 — 같은
   부문이 표(`role_key`)·기준(`fs_div`)별로 여러 줄 나온다. 시계열은 반드시 하나의
   `role_key` 안에서만 구성하고, `duration_type`이 다른 값을 합산하지 마라(이중계상).
+- `search_research`는 리포트 본문 청크를 페이지·섹션 출처, 목표주가·투자의견과
+  함께 반환한다. 특정 종목 질문이면 `code`를 넘겨 좁히고, 시황·산업 리포트를
+  보려면 `code`를 생략한다. 표·상세 근거가 필요하면 반환된 `report_id`로
+  `get_research_report`를 열되 `pages`로 필요한 페이지만 가져온다.
 - 부문 수치를 워크북·보고서에 싣기 전에 `check_segments.py`(플러그인 scripts/)로
   정합성을 확인하라. 특히 부문합이 연결매출을 크게 넘으면(C5 FAIL) 그 부문에
   지분법이익 등 영업외 수익이 섞였을 수 있다 — 지주회사에서 흔하다. 값이 맞아도
@@ -66,6 +72,9 @@ skipper MCP 서버(도구 35종)를 사용해 상장기업을 조사할 때 아�
 - 공시 인용: **접수번호(rcept_no)와 접수일자**를 함께 표기한다. 접수번호는 도구
   결과의 값을 **그대로 복사**한다 — 절대 만들어내지 마라.
 - 뉴스 인용: 제목·발행일·언론사. 내부 ID(kr:*, 뉴스 번호)는 인용 금지.
+- 리포트 인용: **증권사·리포트 제목·발행일(p.페이지)** 형식. 애널리스트의
+  의견·추정·목표주가는 공시된 사실과 구분해 서술하고, 목표주가·투자의견에는
+  발행일을 함께 적는다(그 시점의 의견이다).
 - **그래프 DB 내부 표현은 답변에 노출 금지**: 관계 유형명(`SUPPLIES_TO`,
   `PARTNERS_WITH` 등), `confidence`·`source_news_id` 같은 내부 필드,
   `graph_query`가 반환한 생성 Cypher 원문을 그대로 쓰지 마라. 관계는 도구가
@@ -106,10 +115,27 @@ skipper MCP 서버(도구 35종)를 사용해 상장기업을 조사할 때 아�
    우발부채·약정·특수관계자 거래 확인
 6. **주주환원** — `dividend_history`
 7. **시장 맥락** — `hybrid_search` (뉴스·경쟁·공급망), `api_*` (시세·수급·컨센서스)
+8. **애널리스트 시각** — `search_research`(대상 종목 `code`, 최근 `days`)로
+   증권사 리포트를 검색해 핵심 논지·목표주가·투자의견·실적 추정을 요약하고,
+   근거 확인이 필요한 부분은 `get_research_report`로 전문을 연다
 
 각 단계의 근거(접수번호·기준일)를 모아 최종 답변에서 출처 목록으로 정리한다.
 
-## 5. 워크북 시트 제안
+## 5. 증권가 리포트 곁들이기
+
+기업의 실적·전망·밸류에이션·투자 판단이 걸린 질문에는 데이터 답변에 **증권가
+시각을 한 절로 곁들인다** — `search_research(질문, code=종목코드, days=90)`로
+최근 리포트를 검색해 핵심 논지·목표주가·투자의견을 요약하고, 논지가 관련 종목
+(경쟁·밸류체인)으로 이어지면 그 종목의 리포트까지 확장해 함께 분석한다. 상세
+근거가 필요하면 `report_id`로 `get_research_report`를 연다.
+
+- 공시·재무 데이터로 확인한 사실과 애널리스트 의견을 같은 절에 섞지 않는다 —
+  "증권가 시각" 절로 구분해 §2의 리포트 인용 형식으로 출처를 단다.
+- 단순 사실 조회(지분율 하나, 접수번호 확인 등)에는 붙이지 않는다.
+- 검색 결과가 없으면 "최근 리포트 확인되지 않음"으로 표기한다 — 리포트가
+  없다는 사실도 정보다.
+
+## 6. 워크북 시트 제안
 
 재무제표의 다기간 검증(재작성 추적)이나 사업부문 매출 원자료가 대화의 중심이
 되면, 한 번은 "실사 워크북 시트(엑셀에서 바로 여는 CSV)로 만들어드릴까요?"라고
