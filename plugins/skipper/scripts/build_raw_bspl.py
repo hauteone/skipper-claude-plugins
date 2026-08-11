@@ -134,6 +134,73 @@ def build_block(report: dict[str, Any], company: str, divisor: int,
     return rows
 
 
+def collect_comparables(report: dict[str, Any], wanted: list[str]) -> dict[tuple, float]:
+    """보고서 간 대조 가능한 (기준, 표, 계정, 세부, 기수) → 원단위 금액.
+
+    기수가 명시된 라벨('제 N 기…')만 모은다 — '전기'·'전년동기' 같은 보고서
+    상대 라벨은 보고서마다 가리키는 기간이 달라 대조하면 오탐이 난다.
+    """
+    accounts = json.loads(report.get("accounts") or "[]")
+    fs_div = report.get("fs_div", "")
+    out: dict[tuple, float] = {}
+    for account in accounts:
+        sj_div = account.get("sj_div")
+        if sj_div not in wanted:
+            continue
+        pairs: list[tuple[str, Any]] = []
+        current = (account.get("thstrm_nm") or "").strip()
+        if current:
+            if account.get("thstrm_add_amount"):
+                pairs.append((f"{current} 3개월", account.get("thstrm_amount")))
+                pairs.append((f"{current} 누적", account.get("thstrm_add_amount")))
+            else:
+                pairs.append((current, account.get("thstrm_amount")))
+        prior = (account.get("frmtrm_nm") or "").strip()
+        if prior:
+            pairs.append((prior, account.get("frmtrm_amount")))
+        prior2 = (account.get("bfefrmtrm_nm") or "").strip()
+        if prior2:
+            pairs.append((prior2, account.get("bfefrmtrm_amount")))
+        for label, raw in pairs:
+            if "제" not in label or raw in (None, "", "-"):
+                continue
+            try:
+                value = float(str(raw).replace(",", "").strip())
+            except ValueError:
+                continue
+            key = (fs_div, sj_div, account.get("account_nm", ""),
+                   account.get("account_detail", ""), label)
+            out.setdefault(key, value)
+    return out
+
+
+def compare_reports(selected: list[dict[str, Any]], company: str, wanted: list[str],
+                    divisor: int) -> tuple[int, list[str]]:
+    """같은 기수가 두 보고서 이상에 실린 값을 대조해 (대조 건수, 차이 목록)을 돌려준다.
+
+    좌우 병치 레이아웃이 하던 '보고서끼리 눈대중 비교'를 대신한다 — 재작성
+    (restatement)은 같은 기수의 값이 보고서마다 다른 것으로 드러난다.
+    """
+    seen: dict[tuple, list[tuple[str, float]]] = {}
+    for report in selected:
+        label = report_label(report, company)
+        for key, value in collect_comparables(report, wanted).items():
+            seen.setdefault(key, []).append((label, value))
+    names = dict(STATEMENTS)
+    checked = 0
+    diffs: list[str] = []
+    for key, entries in seen.items():
+        if len(entries) < 2:
+            continue
+        checked += 1
+        if len({value for _, value in entries}) > 1:
+            _, sj_div, account, detail, period = key
+            name = f"{account} ({detail})" if detail else account
+            shown = ", ".join(f"{lbl} {value / divisor:,.0f}" for lbl, value in entries)
+            diffs.append(f"[{names.get(sj_div, sj_div)}] {name} · {period}: {shown}")
+    return checked, diffs
+
+
 def stack_blocks(blocks: list[list[list[Any]]]) -> list[list[Any]]:
     """블록들을 세로로 이어 붙인다. 보고서 사이는 빈 행 2줄로 구분한다
     (표 사이 구분은 빈 행 1줄이라, 2줄이 보고서 경계 표시가 된다)."""
@@ -204,6 +271,19 @@ def main() -> None:
     print(f"보고서 {len(selected)}건 (단위 {args.unit}):")
     for r in selected:
         print(f"  - {report_label(r, company)}  접수번호 {r.get('rcept_no')}  계정 {r.get('account_count')}개")
+
+    checked, diffs = compare_reports(selected, company, wanted, divisor)
+    if checked == 0:
+        print("보고서 간 대조: 같은 기수가 겹치는 계정이 없어 대조를 건너뜁니다.")
+    elif diffs:
+        print(f"보고서 간 대조: 계정·기수 {checked}건 중 값 차이 {len(diffs)}건 — 재작성(restatement) 의심 (단위 {args.unit}):")
+        for line in diffs[:20]:
+            print(f"  - {line}")
+        if len(diffs) > 20:
+            print(f"  … 외 {len(diffs) - 20}건은 CSV에서 확인하세요.")
+    else:
+        print(f"보고서 간 대조: 계정·기수 {checked}건 모두 값 일치 — 재작성 흔적 없음.")
+
     remaining = len(reports) - len(selected)
     if remaining > 0:
         print(f"미포함 보고서 {remaining}건 — 더 넣으려면 --reports 를 올리세요.")
