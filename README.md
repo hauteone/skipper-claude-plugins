@@ -101,7 +101,7 @@ MCP 인가 명세도 쿼리스트링 토큰을 금지하므로, 위의 OAuth 방
 | 항목 | 데스크탑 | Claude Code |
 |---|---|---|
 | 플러그인만 설치했을 때 도구 | **안 잡힘** — 커넥터 필요 | 자동 연결 |
-| 스킬 | 3종 (`skills/`만) | 4종 (`commands/` 포함) |
+| 스킬 | 4종 (`skills/`만) | 5종 (`commands/` 포함) |
 | `userConfig` API 키 설정 | 설정 UI 없음 (커넥터 OAuth로 대체) | `/plugin configure` |
 
 도구가 안 잡히는 직접 원인은 **키를 넣을 곳이 없어서**입니다. 데스크탑에는
@@ -112,7 +112,7 @@ MCP 인가 명세도 쿼리스트링 토큰을 금지하므로, 위의 OAuth 방
 - **`/skipper` 커맨드** — `commands/` 항목은 데스크탑 스킬 목록에 나타나지
   않습니다. 자연어로 물어보면 되고, 도구는 동일하게 동작합니다. 플레이북이
   필요하면 `pe-research` 스킬을 직접 지정하세요.
-- **CSV 시트 생성 스킬(workbook·segment-summary)** — 스킬 자체는 설치되지만, 번들된 파이썬 스크립트가
+- **CSV 생성 스킬(workbook·segment-summary·list-export)** — 스킬 자체는 설치되지만, 번들된 파이썬 스크립트가
   `${CLAUDE_PLUGIN_ROOT}` 경로와 로컬 파일 쓰기를 전제로 해서 데스크탑 실행
   환경에서는 의도대로 동작하지 않습니다. 데스크탑에서 같은 시트가 필요하면
   자연어로 요청하세요 (예: "SK 부문별 매출을 연도별·분기별 표로 만들어 CSV로 줘").
@@ -150,6 +150,22 @@ DART 이용 예시 워크북의 세 개 탭을 CSV로 만들어 줍니다. UTF-8
 `segment-summary`는 초안을 만든 뒤 공시 원문 표로 검증·보정해 렌더링하는 2단계로
 동작합니다 — XBRL 부문 매출만으로는 분기 표가 채워지지 않는 기업이 많기 때문입니다.
 
+### 대량 목록 CSV 내보내기 — list-export
+
+스크리너·공시·리서치 리포트처럼 건수가 많은 목록은 MCP로 가져오면 대화
+컨텍스트를 크게 소모합니다. `list-export` 스킬은 REST를 직접 호출해 컨텍스트를
+거치지 않고 로컬 CSV로 저장하고, 대화에는 건수·경로·미리보기만 보여줍니다.
+리서치 중 목록 결과가 많아 일부만 표시하게 되면 먼저 제안합니다.
+
+예: `/skipper:list-export 스크리너 KOSPI 전체`, `/skipper:list-export 005930 공시 전부 CSV로`
+
+| 데이터 | 수집 범위 |
+|---|---|
+| 종목 스크리너 | 서버 상한 200건 (시가총액 내림차순) |
+| 공시 목록 (시장 전체·종목별) | 묶음 단위(기본 500건)로 끊어 가져오고, 계속할지 물어봄 |
+| 증권사 리서치 리포트 | 묶음 단위, 위와 동일 |
+| 상장 종목 목록 / 일별 시세 / 수급 / 배당 / 재무비율 / ETF 구성 | 서버 상한까지 1회 수집 |
+
 ## 구성
 
 ```
@@ -161,13 +177,15 @@ plugins/skipper/
 │   ├── skipper_api.py                 #   공용 API 클라이언트
 │   ├── build_raw_bspl.py
 │   ├── build_raw_segment.py
-│   └── build_segment_summary.py
+│   ├── build_segment_summary.py
+│   └── export_list.py                 #   목록형 데이터 CSV 내보내기 (list-export 스킬)
 └── skills/
     ├── pe-research/SKILL.md           # 리서치 플레이북 (도구 라우팅·인용 규율·워크북 제안)
     ├── workbook/                      # /skipper:workbook — Raw_BSPL·Raw_부문별매출 시트
     │   ├── SKILL.md                   #   진입·시트 선택·공통 환경/인증/실패 처리
     │   └── references/                #   시트별 상세 절차 (raw-bspl.md, raw-segment.md)
-    └── segment-summary/SKILL.md       # /skipper:segment-summary — 정리예시 시트
+    ├── segment-summary/SKILL.md       # /skipper:segment-summary — 정리예시 시트
+    └── list-export/SKILL.md           # /skipper:list-export — 대량 목록 CSV 내보내기
 ```
 
 시트 생성 스크립트는 Python 3.9+ 표준 라이브러리만 씁니다 (`pip install` 불필요).
