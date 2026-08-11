@@ -1,7 +1,7 @@
 {
   "name": "skipper",
   "description": "한국·미국 상장기업 리서치 — SkipperLabs MCP 도구 35종 + 리서치 플레이북 + 실사 워크북 시트 생성(Raw_BSPL·Raw_부문별매출·정리예시 3개 탭, 리서치 중 자동 제안) + 대량 목록 CSV 내보내기(스크리너·공시·리서치 리포트 등을 컨텍스트 우회로 저장). 설치 후 /plugin configure 로 API 키를 설정하거나 SKIPPER_API_KEY 환경변수를 쓰세요.",
-  "version": "0.7.6",
+  "version": "0.7.7",
   "author": {
     "name": "SkipperLabs",
     "email": "support@skipperlabs.ai"

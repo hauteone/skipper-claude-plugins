@@ -10,7 +10,7 @@
   python3 export_list.py screener --param market=KOSPI
   python3 export_list.py disclosures --symbol 005930
   python3 export_list.py latest-disclosures --param from=2026-01-01
-  python3 export_list.py kr-research-reports --param query=반도체
+  python3 export_list.py kr-research-reports --param q=반도체
   python3 export_list.py historical-prices --symbol 005930 --param from=2020-01-01
   python3 export_list.py stock-list
 
