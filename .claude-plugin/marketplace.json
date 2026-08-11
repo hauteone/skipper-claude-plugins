@@ -13,7 +13,6 @@
       "name": "skipper",
       "source": "./plugins/skipper",
       "description": "한국·미국 상장기업 리서치 — MCP 도구 35종(공시·지분·재무·배당·뉴스 지식그래프) + 리서치 플레이북 + 실사 워크북 시트 생성 스킬 3종. Claude Code·데스크탑 모두 지원",
-      "version": "0.6.0",
       "author": {
         "name": "SkipperLabs"
       },

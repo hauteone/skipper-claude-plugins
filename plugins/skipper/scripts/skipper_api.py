@@ -3,9 +3,11 @@
 스킬의 빌드 스크립트가 그래프 도구를 직접 호출할 때 쓴다. fs_reports처럼 응답이
 수 MB인 도구를 모델 컨텍스트를 거치지 않고 받아 파일로 떨구기 위한 경로다.
 
-필요 환경변수:
-  SKIPPER_API_KEY   발급받은 API 키 (플러그인 .mcp.json이 쓰는 키와 동일)
-  SKIPPER_API_URL   기본값 https://api.skipperlabs.ai
+필요 환경변수 (둘 중 하나):
+  SKIPPER_API_KEY      발급받은 정적 API 키 (만료 없음 — 반복 실행에 권장)
+  SKIPPER_ACCESS_TOKEN MCP 커넥터와 같은 계정의 OAuth 액세스 토큰 (만료됨).
+                        SKIPPER_API_KEY가 있으면 이 값은 무시된다.
+  SKIPPER_API_URL      기본값 https://api.skipperlabs.ai
 
 개발용 우회 (SkipperLabs 내부 전용): SKIPPER_GRAPH_URL과 SKIPPER_INTERNAL_TOKEN이
 함께 설정되면 그래프 내부 엔드포인트를 직접 호출한다. 외부 사용자와는 무관하다.
@@ -26,14 +28,31 @@ DEFAULT_API_URL = "https://api.skipperlabs.ai"
 DEFAULT_TIMEOUT = 180
 
 _NO_KEY_MESSAGE = (
-    "SKIPPER_API_KEY 환경변수가 비어 있습니다. 발급받은 키를 셸에 설정하세요:\n"
-    '  export SKIPPER_API_KEY="sk-skp-..."\n'
+    "SKIPPER_API_KEY 또는 SKIPPER_ACCESS_TOKEN 환경변수가 비어 있습니다. "
+    "둘 중 하나를 셸에 설정하세요:\n"
+    '  export SKIPPER_API_KEY="sk-skp-..."      # 정적 키 (권장 — 만료 없음)\n'
+    '  export SKIPPER_ACCESS_TOKEN="..."        # OAuth 액세스 토큰 (MCP 커넥터와 동일 계정, 만료됨)\n'
     "키 발급 문의: support@skipperlabs.ai"
 )
 
 
 class SkipperError(RuntimeError):
     """도구 호출 실패 — 메시지를 사용자에게 그대로 보여줄 수 있는 수준으로 적는다."""
+
+
+def _auth_header() -> dict[str, str]:
+    """정적 API 키가 있으면 X-API-Key, 없으면 OAuth 액세스 토큰으로 Bearer.
+
+    서버 쪽 인증 미들웨어와 같은 우선순위다 (X-API-Key를 먼저 보고,
+    없을 때만 Authorization: Bearer를 본다).
+    """
+    api_key = os.environ.get("SKIPPER_API_KEY", "").strip()
+    if api_key:
+        return {"X-API-Key": api_key}
+    access_token = os.environ.get("SKIPPER_ACCESS_TOKEN", "").strip()
+    if access_token:
+        return {"Authorization": f"Bearer {access_token}"}
+    raise SkipperError(_NO_KEY_MESSAGE)
 
 
 def _endpoint() -> tuple[str, dict[str, str], bool]:
@@ -46,15 +65,9 @@ def _endpoint() -> tuple[str, dict[str, str], bool]:
             {"Content-Type": "application/json", "X-Internal-Token": internal_token},
             True,
         )
-    api_key = os.environ.get("SKIPPER_API_KEY", "").strip()
-    if not api_key:
-        raise SkipperError(_NO_KEY_MESSAGE)
     base = os.environ.get("SKIPPER_API_URL", DEFAULT_API_URL).rstrip("/")
-    return (
-        base + "/api/v1/tools/{name}",
-        {"Content-Type": "application/json", "X-API-Key": api_key},
-        False,
-    )
+    headers = {"Content-Type": "application/json", **_auth_header()}
+    return (base + "/api/v1/tools/{name}", headers, False)
 
 
 def _rest_target() -> tuple[str, dict[str, str]]:
@@ -64,11 +77,8 @@ def _rest_target() -> tuple[str, dict[str, str]]:
     iceberg 원천을 직접 읽는 엔드포인트는 게이트웨이를 거치지 않고 이 경로로 부른다.
     내부 우회(SKIPPER_GRAPH_URL)는 그래프 전용이라 여기서는 쓰지 않는다.
     """
-    api_key = os.environ.get("SKIPPER_API_KEY", "").strip()
-    if not api_key:
-        raise SkipperError(_NO_KEY_MESSAGE)
     base = os.environ.get("SKIPPER_API_URL", DEFAULT_API_URL).rstrip("/")
-    return base, {"X-API-Key": api_key}
+    return base, _auth_header()
 
 
 def _fetch(req: urllib.request.Request, label: str, timeout: int) -> Any:
@@ -80,7 +90,7 @@ def _fetch(req: urllib.request.Request, label: str, timeout: int) -> Any:
         detail = exc.read().decode("utf-8", "replace")[:400]
         if exc.code == 401:
             raise SkipperError(
-                f"API 키 인증 실패 (401) — SKIPPER_API_KEY를 확인하세요. 응답: {detail}"
+                f"인증 실패 (401) — SKIPPER_API_KEY 또는 SKIPPER_ACCESS_TOKEN을 확인하세요. 응답: {detail}"
             ) from exc
         raise SkipperError(f"{label} 호출 실패 (HTTP {exc.code}): {detail}") from exc
     except urllib.error.URLError as exc:

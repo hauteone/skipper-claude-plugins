@@ -37,6 +37,18 @@ echo 'export SKIPPER_API_KEY=sk-skp-...' >> ~/.zshrc   # 기존 환경변수 방
 재시작하면 `skipper` MCP 서버(도구 35종), 스킬 5종, `/skipper` 커맨드가
 활성화됩니다. 확인: `claude mcp list` 또는 `/skipper 삼성전자 주주 구성`.
 
+### 자동 업데이트 켜기 (권장)
+
+서드파티 마켓플레이스는 자동 업데이트가 기본 꺼짐입니다. 한 번만 켜두면
+새 버전이 푸시될 때 자동으로 반영됩니다.
+
+```
+/plugin → Marketplaces → skipperlabs → Enable auto-update
+```
+
+세션 시작 후 최대 10분 내에 업데이트를 확인하며, 새 버전이 있으면
+`/reload-plugins` 안내가 뜨거나 다음 실행 때 적용됩니다.
+
 ---
 
 ## Claude 데스크탑 / Cowork 설치
