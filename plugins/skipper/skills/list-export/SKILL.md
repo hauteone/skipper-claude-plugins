@@ -50,7 +50,7 @@ MCP 도구로 목록을 가져오면 응답 전체가 모델 컨텍스트에 실
 cd "${CLAUDE_PLUGIN_ROOT}/scripts"
 python3 export_list.py screener --param market=KOSPI
 python3 export_list.py disclosures --symbol 005930 --param from=2025-01-01
-python3 export_list.py kr-research-reports --param query=반도체
+python3 export_list.py kr-research-reports --param q=반도체
 python3 export_list.py historical-prices --symbol 005930 --param from=2020-01-01
 ```
 
