@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""Raw_BSPL 시트 생성 — 정기보고서별 연결재무제표 4표를 열 블록으로 나란히 편다.
+"""Raw_BSPL 시트 생성 — 정기보고서별 연결재무제표 4표를 세로로 이어 붙인다.
 
-원본 엑셀 'Raw_BSPL' 탭은 DART 뷰어의 "2. 연결재무제표"(재무상태표·포괄손익계산서·
-자본변동표·현금흐름표)를 보고서마다 복사해 옆으로 붙인 것이다. 이 스크립트는 같은
-구조를 OpenDART 전체계정(fs_reports)에서 구조화된 값으로 재현한다.
+DART 뷰어의 "2. 연결재무제표"(재무상태표·포괄손익계산서·자본변동표·현금흐름표)를
+보고서 단위 블록으로 만들어 아래로 쌓는다. 표가 좌우로 갈라지지 않는 단일 열
+흐름이라 스크롤·필터 작업이 쉽고, 보고서별 as-reported 값은 그대로 유지된다.
 
 사용:
   python3 build_raw_bspl.py "SK" --reports 4 --unit 백만원
@@ -29,9 +29,6 @@ REPORT_ORDER = {"11013": 1, "11012": 2, "11014": 3, "11011": 4}
 STATEMENTS = [("BS", "재무상태표"), ("CIS", "포괄손익계산서"), ("SCE", "자본변동표"), ("CF", "현금흐름표")]
 
 UNITS = {"원": 1, "천원": 1_000, "백만원": 1_000_000, "억원": 100_000_000}
-
-# 블록 한 칸의 열 구성 (마지막은 블록 사이 여백).
-BLOCK_WIDTH = 9
 
 
 def parse_amount(raw: Any, divisor: int) -> Any:
@@ -104,7 +101,7 @@ def statement_headers(accounts: list[dict[str, Any]]) -> list[str]:
 
 def build_block(report: dict[str, Any], company: str, divisor: int,
                 unit: str, wanted: list[str]) -> list[list[Any]]:
-    """보고서 하나를 세로 행 목록으로 만든다. 각 행의 길이는 BLOCK_WIDTH."""
+    """보고서 하나를 세로 행 목록으로 만든다."""
     accounts = json.loads(report.get("accounts") or "[]")
     rows: list[list[Any]] = [
         [report_label(report, company)],
@@ -134,19 +131,18 @@ def build_block(report: dict[str, Any], company: str, divisor: int,
                 parse_amount(account.get("bfefrmtrm_amount"), divisor),
             ])
 
-    return [row + [""] * (BLOCK_WIDTH - len(row)) for row in rows]
+    return rows
 
 
-def merge_blocks(blocks: list[list[list[Any]]]) -> list[list[Any]]:
-    """블록들을 좌우로 이어 붙인다. 짧은 블록은 빈 칸으로 채운다."""
-    height = max((len(b) for b in blocks), default=0)
-    merged: list[list[Any]] = []
-    for i in range(height):
-        row: list[Any] = []
-        for block in blocks:
-            row.extend(block[i] if i < len(block) else [""] * BLOCK_WIDTH)
-        merged.append(row)
-    return merged
+def stack_blocks(blocks: list[list[list[Any]]]) -> list[list[Any]]:
+    """블록들을 세로로 이어 붙인다. 보고서 사이는 빈 행 2줄로 구분한다
+    (표 사이 구분은 빈 행 1줄이라, 2줄이 보고서 경계 표시가 된다)."""
+    stacked: list[list[Any]] = []
+    for i, block in enumerate(blocks):
+        if i:
+            stacked.extend([[], []])
+        stacked.extend(block)
+    return stacked
 
 
 def main() -> None:
@@ -198,7 +194,7 @@ def main() -> None:
     selected = reports[: args.reports]
 
     blocks = [build_block(r, company, divisor, args.unit, wanted) for r in selected]
-    grid = merge_blocks(blocks)
+    grid = stack_blocks(blocks)
 
     out = args.out or f"{company}_Raw_BSPL_{date.today():%Y%m%d}.csv"
     write_csv(out, grid)
