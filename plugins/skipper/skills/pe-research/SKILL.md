@@ -27,6 +27,7 @@ skipper MCP 서버를 사용해 상장기업을 조사할 때 아래 규율을 �
 | 재무제표·수익성·증감 분석 | `financial_statements` | `api_income_statement`, `api_ratios` |
 | 부문·지역·제품별 매출 추이 (연도별·분기별 표) | `api_revenue_segments`(원천 직결, 표·기준·기간을 하나로 좁혀 줌) | `segment_series`(보고서 원문 섹션 동봉), `segment_facts`, `get_document` |
 | 재무제표 주석 (우발부채·약정·특수관계자·충당부채) | `financial_notes` | `get_document` |
+| 차입금·사채 잔액 (총액·유동/비유동·순차입 시계열) | `api_balance_sheet` (`shortTermDebt`·`longTermDebt`·`totalDebt`·`netDebt`) | `fs_reports` 원장(workbook), `financial_notes` |
 | 배당 이력·배당성향 | `dividend_history` | `api_dividends` |
 | 특정 기업의 공시 목록 | `list_disclosures` | — |
 | 공시 원문 정독 | `get_document` (대형 문서는 `section=` 정조준) | — |
@@ -43,7 +44,17 @@ skipper MCP 서버를 사용해 상장기업을 조사할 때 아래 규율을 �
   성격을 구분하라 — 신규 발행결정과 정정·상환을 섞어 세지 마라.
 - snippet으로 핵심 파악이 되면 건별 `get_document`는 꼭 필요한 소수 건만 한다.
 - 사업보고서 같은 대형 문서는 `get_document(doc_id, section="타법인출자")`처럼
-  섹션을 정조준한다. 목차는 `__TOC__`로 먼저 확인할 수 있다.
+  섹션을 정조준한다. 목차는 `__TOC__`로 먼저 확인할 수 있다. **섹션 키워드는
+  목차 제목 그대로 쓴다** (예: '수주'가 아니라 '수주상황') — 매칭에 실패하면
+  섹션 대신 문서 앞부분 약 100KB가 통째로 반환된다(응답의 `text_source`가
+  `sections`가 아니라 `full`이면 매칭 실패이니 섹션 제목을 고쳐 재시도).
+  재무 챕터(재무제표 주석 등)는 섹션 정조준이 되지 않을 수 있다 — 그 경우
+  `financial_notes`로 우회한다.
+- 차입금 질문: 총액·유동/비유동·순차입 시계열은 `api_balance_sheet`가 정답이다
+  (조선·중공업의 통합 계정 "차입금 및 사채"도 매핑된다). **차입처·이자율·만기
+  상세는 재무제표 주석에만 있어 현재 도구로 정조준이 어렵다** —
+  `financial_notes` 키워드 발췌(최신 보고서 기준)로 확인되는 범위만 서술하고,
+  확인 안 되는 상세는 한계를 명시한다.
 - **도구가 빈 결과를 준 것과 공시에 없는 것은 다르다.** 그래프 계열 도구
   (`segment_series`·`segment_facts`·`graph_query` 등)는 적재가 지연되면 데이터가
   있어도 0건을 반환한다. 특히 부문 질문에서 `segment_series`가 비면
@@ -75,6 +86,11 @@ skipper MCP 서버를 사용해 상장기업을 조사할 때 아래 규율을 �
 - 리포트 인용: **증권사·리포트 제목·발행일(p.페이지)** 형식. 애널리스트의
   의견·추정·목표주가는 공시된 사실과 구분해 서술하고, 목표주가·투자의견에는
   발행일을 함께 적는다(그 시점의 의견이다).
+- 리포트 **figure(차트) 캡션의 수치는 인용 금지** — 캡션은 자동 생성 요약이라
+  축 단위를 오독할 수 있다(실측 사례: 축값 10,000의 실제 단위가 십억원인데
+  캡션이 "약 10,000억원"으로 서술 → 그대로 인용하면 10배 오류). 수치는
+  표(kind:table) 청크나 공시 원문으로 교차 확인한 것만 쓰고, figure 캡션은
+  방향성 서술에만 쓴다.
 - **그래프 DB 내부 표현은 답변에 노출 금지**: 관계 유형명(`SUPPLIES_TO`,
   `PARTNERS_WITH` 등), `confidence`·`source_news_id` 같은 내부 필드,
   `graph_query`가 반환한 생성 Cypher 원문을 그대로 쓰지 마라. 관계는 도구가

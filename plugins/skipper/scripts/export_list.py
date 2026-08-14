@@ -8,6 +8,7 @@
 
 사용:
   python3 export_list.py screener --param market=KOSPI
+  python3 export_list.py screener --top 500 --param market=KOSPI
   python3 export_list.py disclosures --symbol 005930
   python3 export_list.py latest-disclosures --param from=2026-01-01
   python3 export_list.py kr-research-reports --param q=반도체
@@ -42,8 +43,7 @@ DATASETS: dict[str, dict[str, Any]] = {
     "screener": {
         "path": "/api/v1/screener",
         "mode": "single",
-        "fixed": {"limit": 200},
-        "note": "서버 상한 200건 — 시가총액 내림차순 상위 200개까지만 온다",
+        "note": "1회 응답 상한 200건 — --top N(>200)이면 시총 커서로 나눠 이어붙인다",
     },
     "latest-disclosures": {
         "path": "/api/v1/disclosures",
@@ -100,6 +100,7 @@ DATASETS: dict[str, dict[str, Any]] = {
 }
 
 DEFAULT_MAX_PAGES = 5  # paged 데이터셋 1회 실행당 기본 묶음 (5페이지 = 최대 500건)
+SCREENER_PAGE = 200  # 스크리너 1회 응답 서버 상한
 
 
 def flatten(row: dict[str, Any], prefix: str = "") -> dict[str, Any]:
@@ -159,6 +160,36 @@ def fetch_single(path: str, params: dict[str, Any], unwrap: str | None) -> list[
     return data
 
 
+def fetch_screener(path: str, params: dict[str, Any], top: int) -> list[dict[str, Any]]:
+    """시총 내림차순 스크리너 — 상한(200건)을 넘는 요청은 marketCapLowerThan 커서로 잇는다.
+
+    경계 시총 종목이 다음 페이지 첫 행에 다시 올 수 있어(<= 동작, 실측 확인)
+    symbol 기준으로 중복을 걸러낸다. 짧은 페이지가 오면 시장 끝이다.
+    """
+    rows: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    cursor = dict(params, limit=SCREENER_PAGE)
+    while len(rows) < top:
+        chunk = get_json(path, **cursor)
+        if not isinstance(chunk, list):
+            raise SkipperError(f"예상과 다른 응답 형식입니다 (list가 아님): {str(chunk)[:200]}")
+        added = 0
+        for row in chunk:
+            symbol = str(row.get("symbol", ""))
+            if symbol in seen:
+                continue
+            seen.add(symbol)
+            rows.append(row)
+            added += 1
+            if len(rows) >= top:
+                return rows
+        last_cap = chunk[-1].get("marketCap") if chunk else None
+        if len(chunk) < SCREENER_PAGE or added == 0 or not isinstance(last_cap, (int, float)):
+            break  # 시장 끝이거나 커서가 더 나아가지 못한다
+        cursor["marketCapLowerThan"] = last_cap
+    return rows
+
+
 def fetch_paged(path: str, params: dict[str, Any], start_page: int,
                 max_pages: int) -> tuple[list[dict[str, Any]], int, bool]:
     """(rows, 마지막으로 읽은 page, 더 남았을 가능성) — 짧은 페이지가 나오면 끝."""
@@ -194,6 +225,9 @@ def main() -> None:
     parser.add_argument("--symbol", default="", help="KRX 6자리 종목코드 (종목 단위 데이터셋 필수)")
     parser.add_argument("--param", action="append", default=[],
                         help="추가 쿼리 파라미터 key=value (반복 지정 가능). 예: --param market=KOSPI")
+    parser.add_argument("--top", type=int, default=SCREENER_PAGE,
+                        help=f"screener 전용: 수집 목표 건수 (기본 {SCREENER_PAGE}). "
+                             f"{SCREENER_PAGE} 초과 시 시총 커서(marketCapLowerThan)로 나눠 이어붙인다")
     parser.add_argument("--max-pages", type=int, default=DEFAULT_MAX_PAGES,
                         help=f"페이지네이션 데이터셋의 1회 실행당 페이지 수 (기본 {DEFAULT_MAX_PAGES} = 최대 {DEFAULT_MAX_PAGES * PAGE_SIZE}건)")
     parser.add_argument("--start-page", type=int, default=0, help="이어받기 시작 페이지 (0-베이스)")
@@ -204,6 +238,8 @@ def main() -> None:
     spec = DATASETS[args.dataset]
     if spec.get("needs_symbol") and not args.symbol:
         fail(f"{args.dataset}은(는) --symbol이 필요합니다 (KRX 6자리 종목코드)")
+    if args.top != SCREENER_PAGE and args.dataset != "screener":
+        fail("--top은 screener 전용입니다")
 
     params = {**spec.get("fixed", {}), **parse_extra_params(args.param)}
     path = spec["path"].format(symbol=args.symbol)
@@ -214,7 +250,10 @@ def main() -> None:
         fail(f"--append 대상 파일이 없습니다: {out} (--out으로 기존 파일을 지정하세요)")
 
     try:
-        if spec["mode"] == "paged":
+        if args.dataset == "screener":
+            raw = fetch_screener(path, params, args.top)
+            last_page, maybe_more = 0, False
+        elif spec["mode"] == "paged":
             raw, last_page, maybe_more = fetch_paged(path, params, args.start_page, args.max_pages)
         else:
             raw = fetch_single(path, params, spec.get("unwrap"))
