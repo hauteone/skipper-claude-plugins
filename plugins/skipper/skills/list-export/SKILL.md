@@ -33,7 +33,7 @@ MCP 도구로 목록을 가져오면 응답 전체가 모델 컨텍스트에 실
 
 | 데이터 | dataset 인자 | 필수 인자 | 수집 범위 |
 |---|---|---|---|
-| 종목 스크리너 | `screener` | — | 서버 상한 200건 (시가총액 내림차순) |
+| 종목 스크리너 | `screener` | — | 기본 200건 — `--top N`으로 시총 커서 분할 조회 (예: `--top 500`) |
 | 시장 전체 공시 | `latest-disclosures` | — | 묶음 단위 (아래 규칙) |
 | 종목별 공시 | `disclosures` | `--symbol` | 묶음 단위 (아래 규칙) |
 | 증권사 리서치 리포트 | `kr-research-reports` | — (symbol 선택) | 묶음 단위 (아래 규칙) |
@@ -49,6 +49,7 @@ MCP 도구로 목록을 가져오면 응답 전체가 모델 컨텍스트에 실
 ```bash
 cd "${CLAUDE_PLUGIN_ROOT}/scripts"
 python3 export_list.py screener --param market=KOSPI
+python3 export_list.py screener --top 500 --param market=KOSPI
 python3 export_list.py disclosures --symbol 005930 --param from=2025-01-01
 python3 export_list.py kr-research-reports --param q=반도체
 python3 export_list.py historical-prices --symbol 005930 --param from=2020-01-01
@@ -76,16 +77,25 @@ python3 export_list.py historical-prices --symbol 005930 --param from=2020-01-01
    매 묶음마다 다시 물어본다. 사용자가 "끝까지 다 가져와"라고 명시했으면
    묻지 않고 반복해도 된다.
 
-## 실행 환경 확인
+## 실행 환경 확인 — 두 가지 폴백 케이스
 
-`${CLAUDE_PLUGIN_ROOT}`가 비어 있거나 `scripts/export_list.py`가 존재하지
-않으면 스크립트 실행이 불가능한 환경이다(claude.ai 챗의 "스킬" 기능은
-플러그인의 개별 스킬 폴더만 올리고 `scripts/`는 가져오지 않는다 — Claude
-Code와 Cowork는 플러그인 전체를 마운트하므로 문제없다). 이 경우 MCP 도구로
-파라미터를 좁혀 가져와 표로 정리해 전달한다. 사유를 설명할 때는 "CSV 자동
-내보내기는 스크립트가 실행되는 환경(Claude Code·Cowork)에서만 가능하다"
-한 줄만 쓴다 — **API 키·토큰 이야기는 꺼내지 않는다** (키가 있어도 이
-환경에서는 스크립트를 실행할 수 없으므로 "키가 없어서"는 틀린 설명이다).
+**케이스 1 — 스크립트가 없는 환경.** `${CLAUDE_PLUGIN_ROOT}`가 비어 있거나
+`scripts/export_list.py`가 존재하지 않으면 스크립트 실행이 불가능한
+환경이다(claude.ai 챗의 "스킬" 기능은 플러그인의 개별 스킬 폴더만 올리고
+`scripts/`는 가져오지 않는다). 사유는 "CSV 자동 내보내기는 스크립트가
+실행되는 환경에서만 가능하다" 한 줄만 쓴다.
+
+**케이스 2 — 스크립트는 있지만 외부 REST가 막힌 환경.** 클라우드 샌드박스
+(claude.ai Cowork 등)는 플러그인 전체가 마운트되지만 외부 API 직접 호출이
+네트워크 정책으로 차단될 수 있다 — 스크립트가 네트워크 오류로 실패하면 이
+경우다. 사유는 "이 환경은 외부 API 직접 호출이 막혀 있어 MCP 도구로
+수집했다" 한 줄만 쓴다.
+
+두 케이스 모두 MCP 도구로 폴백해 수집·정리해 전달하며, **API 키·토큰
+이야기는 꺼내지 않는다** (키가 있어도 해결되지 않는 환경 문제라 "키가
+없어서"는 틀린 설명이다). 폴백에서 스크리너 200건 초과가 필요하면
+`api_screener`를 `marketCapLowerThan` 커서로 나눠 호출하고 `symbol` 기준으로
+중복을 제거하며 병합한다 (경계 시총 종목이 다음 페이지에 다시 올 수 있다).
 
 ## 인증
 
