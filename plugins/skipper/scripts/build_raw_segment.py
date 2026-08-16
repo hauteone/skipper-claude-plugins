@@ -6,6 +6,11 @@
 그 아래에 XBRL 부문 팩트를 표로 덧붙인다 — 원문은 표 구조가 평문으로 눌려 있어
 숫자 작업에는 팩트 표가 필요하다.
 
+시트 맨 위에는 정리표 빈 양식 2개(1. 연도별 / 2. 분기별 매출액 및 비중)를 붙인다.
+부문 행 이름과 기간 열만 채우고 값은 비워 둔다 — XBRL 팩트는 원문 대조 전이라
+그대로 믿을 수 없고, 부분합으로 합계·비중을 내면 오독을 부른다. 검증된 채움이
+필요하면 segment-summary 스킬을 쓴다.
+
 사용:
   python3 build_raw_segment.py "SK" --reports 5
 """
@@ -20,6 +25,7 @@ from datetime import date
 from typing import Any
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from build_segment_summary import quarter_labels  # noqa: E402
 from skipper_api import SkipperError, call, fail, resolve, segments, write_csv  # noqa: E402
 
 # 부문 매출이 실리는 두 섹션. '4. 매출 및 수주상황'에 부문별 매출·비중 표가 있고,
@@ -39,6 +45,10 @@ DURATION_NAMES = {"fy": "연간", "q3m": "3개월", "ytd": "누적", "instant": 
 
 # 연간 + 단일분기 4개. 누적(H1·9M)은 분기 합과 겹쳐 표를 부풀리므로 기본에서 뺀다.
 DEFAULT_PERIODS = ("FY", "Q1", "Q2", "Q3", "Q4")
+
+# 상단 정리표 양식의 분기 열 수. 원본 워크북 정리예시 탭과 같다.
+SUMMARY_QUARTERS = 5
+QUARTER_BY_MONTH = {"03": 1, "06": 2, "09": 3, "12": 4}
 
 
 def split_lines(text: str) -> list[str]:
@@ -218,6 +228,68 @@ def facts_rows(rows: list[dict[str, Any]]) -> list[list[Any]]:
     return out
 
 
+def latest_quarter_from_reports(reports: list[dict[str, Any]]) -> tuple[int, int]:
+    """이미 가져온 보고서 목록(최신순)에서 최신 분기를 읽는다. 못 읽으면 오늘 기준 추정."""
+    for report in reports:
+        for text in (report.get("title", ""), report.get("period_hint", "")):
+            match = re.search(r"\((\d{4})\.(\d{2})\)", text or "")
+            if match and match.group(2) in QUARTER_BY_MONTH:
+                return int(match.group(1)), QUARTER_BY_MONTH[match.group(2)]
+    today = date.today()
+    return today.year, max(1, (today.month - 1) // 3)
+
+
+def summary_scaffold(company: str, facts: list[dict[str, Any]],
+                     reports: list[dict[str, Any]],
+                     years: int) -> tuple[list[list[Any]], list[str], bool]:
+    """정리표 빈 양식 2개 — (행 목록, 부문 행 이름, 자리표시자 여부).
+
+    값은 채우지 않는다. XBRL 팩트는 원문 대조 전이라 그대로 믿을 수 없고, 빈 칸이
+    남은 채 합계·비중을 내면 부분합이 100%로 부풀어 오독되기 때문이다. 부문 행
+    이름만 팩트(사업부문 축·매출액)에서 가져오되, 정규화명으로 묶어 가장 최근
+    연도의 공시 표기를 쓴다. 팩트가 없으면 자리표시자 두 줄을 넣는다.
+    """
+    best: dict[str, tuple[int, str]] = {}
+    fy_years: set[int] = set()
+    for fact in facts:
+        if fact.get("axis_type") != "segment" or fact.get("metric") != "revenue":
+            continue
+        try:
+            year = int(fact.get("year") or 0)
+        except (TypeError, ValueError):
+            year = 0
+        if year and fact.get("period") == "FY":
+            fy_years.add(year)
+        norm = fact.get("normalized") or fact.get("member") or ""
+        if norm and (norm not in best or year > best[norm][0]):
+            best[norm] = (year, fact.get("member") or norm)
+
+    placeholder = not best
+    names = [best[k][1] for k in sorted(best)] if best else ["A 부문", "B 부문"]
+
+    latest = latest_quarter_from_reports(reports)
+    last_fy = max(fy_years) if fy_years else latest[0] - 1
+    annual_periods = [str(last_fy - i) for i in range(years - 1, -1, -1)]
+    quarter_periods = quarter_labels(latest, SUMMARY_QUARTERS)
+
+    def table(title: str, periods: list[str]) -> list[list[Any]]:
+        blanks = [""] * len(periods)
+        rows: list[list[Any]] = [[title], ["구분", *periods]]
+        rows.extend([f"{company} {name} 매출액", *blanks] for name in names)
+        rows.append(["합계", *blanks])
+        rows.extend([f"{company} {name} 매출 비중", *blanks] for name in names)
+        return rows
+
+    rows = table("1. 연도별 매출액 및 비중 (단위: 백만원)", annual_periods)
+    rows.append([])
+    rows.extend(table("2. 분기별 매출액 및 비중 (단위: 백만원, 단일분기 기준)", quarter_periods))
+    rows.append([])
+    rows.append(["※ 위 정리표는 빈 양식입니다 — 아래 보고서 원문과 XBRL 부문 팩트를 대조해 "
+                 "채우세요. 부문 구분이 원문 표와 다르면 원문을 따릅니다. "
+                 "초안 자동 채움·검증은 segment-summary 스킬을 사용합니다."])
+    return rows, names, placeholder
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Raw_부문별매출 시트(CSV) 생성")
     parser.add_argument("company", help="회사명 또는 6자리 종목코드")
@@ -256,7 +328,9 @@ def main() -> None:
         fail(f"{company['name']}: '주요 제품 및 서비스' 섹션이 있는 정기보고서를 찾지 못했습니다.")
         return
 
-    grid: list[list[Any]] = []
+    grid, seg_names, placeholder = summary_scaffold(
+        company["name"], facts, reports, args.years)
+    grid.append([])
     blocks = [build_block(r) for r in reports]
     height = max(len(b) for b in blocks)
     for i in range(height):
@@ -274,6 +348,12 @@ def main() -> None:
 
     print(f"생성: {out}")
     print(f"기업: {company['name']} ({company['ticker']})  출처: {source}")
+    if placeholder:
+        print("상단 정리표 양식(빈칸) 추가 — XBRL 부문명이 없어 자리표시자(A 부문·B 부문)로")
+        print("      넣었습니다. 원문 표의 부문 구분으로 행 이름을 바꿔 쓰세요.")
+    else:
+        print(f"상단 정리표 양식(빈칸) 추가 — 부문 행 {len(seg_names)}개: {', '.join(seg_names)}")
+        print("      부문 구분이 원문 '4. 매출 및 수주상황' 표와 다르면 원문을 따르세요.")
     print(f"보고서 {len(reports)}건:")
     for r in reports:
         titles = ", ".join(s.get("title", "") for s in r["sections"])
