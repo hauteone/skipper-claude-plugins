@@ -1,20 +1,29 @@
 ---
 name: workbook
 description: >
-  한국 상장사의 PE 실사 워크북 시트(엑셀에서 바로 여는 CSV)를 만든다 —
-  보고서별 연결재무제표 원자료(Raw_BSPL 탭)와 사업부문 공시 원문+XBRL 팩트
-  (Raw_부문별매출 탭). 재무·부문 데이터를 엑셀이나 CSV 파일로 요청받았거나,
+  한국 상장사의 PE 실사 워크북 시트를 만든다 — 보고서별 연결재무제표
+  원자료(Raw_BSPL 탭)와 사업부문 공시 원문+XBRL 팩트(Raw_부문별매출 탭).
+  산출물은 CSV(엑셀에서 바로 열림)와 xlsx 두 가지를 기본 제공한다.
+  재무·부문 데이터를 엑셀이나 CSV 파일로 요청받았거나,
   리서치 중 시트 생성 제안을 사용자가 수락했을 때 사용한다. Use when the user
-  wants Korean listed-company financial statements or segment disclosures as an
-  Excel-ready CSV worksheet, or accepts an offer to build one.
+  wants Korean listed-company financial statements or segment disclosures as a
+  spreadsheet (CSV or xlsx), or accepts an offer to build one.
 ---
 
 # 실사 워크북 시트 생성 — Raw_BSPL · Raw_부문별매출
 
-DART 이용 예시 워크북의 원자료 탭 두 개를 CSV로 만든다. UTF-8 BOM으로 쓰므로
-엑셀에서 더블클릭하면 한글이 깨지지 않고 바로 열린다. 산출물은 .xlsx가 아니라
-**엑셀에서 바로 여는 CSV**다 — 사용자가 "엑셀로"라고 요청해도 이 형식으로
-만들고 그렇게 안내한다.
+DART 이용 예시 워크북의 원자료 탭 두 개를 만든다. 조판 스크립트의 산출물은
+UTF-8 BOM CSV라 엑셀에서 더블클릭해도 한글이 깨지지 않는다.
+
+## 출력 형식 — CSV와 xlsx 둘 다 기본 제공
+
+- 스크립트가 만든 CSV(UTF-8 BOM)와, 그것을 Anthropic 기본 제공 xlsx
+  스킬(`Skill("xlsx")`)로 변환한 .xlsx를 **둘 다** 전달한다. 값과 행 구조는
+  CSV 그대로 옮기고 임의 서식·수식을 더하지 않는다. 두 시트를 함께
+  요청받았으면 xlsx는 한 파일의 탭 두 개(Raw_BSPL·Raw_부문별매출)로 합친다.
+- 사용자가 형식을 하나만 지정하면 그 형식만 전달한다.
+- xlsx 스킬이 없는 환경이면 CSV만 전달하고 그 사실을 안내한다 — 형식을 이유로
+  데이터 생성을 줄이거나 미루지 않는다.
 
 ## 진입 경로 — 두 가지
 
