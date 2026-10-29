@@ -1,7 +1,7 @@
 {
   "name": "skipper",
-  "description": "한국·미국 상장기업 리서치 — SkipperLabs MCP 도구 35종 + 리서치 플레이북 + 실사 워크북 시트 생성(Raw_BSPL·Raw_부문별매출·정리예시 3개 탭, 리서치 중 자동 제안) + 대량 목록 CSV 내보내기(스크리너·공시·리서치 리포트 등을 컨텍스트 우회로 저장). 설치 후 /plugin configure 로 API 키를 설정하거나 SKIPPER_API_KEY 환경변수를 쓰세요.",
-  "version": "0.7.12",
+  "description": "한국·미국 상장기업 리서치 — SkipperLabs MCP 도구 35종 + 리서치 플레이북 + 실사 워크북 시트 생성(Raw_BSPL·Raw_부문별매출·정리예시 3개 탭, 리서치 중 자동 제안) + 대량 목록 CSV 내보내기(스크리너·공시·리서치 리포트 등을 컨텍스트 우회로 저장). 설치 후 /plugin configure 로 API 키를 설정하거나 SKIPPER_API_KEY 환경변수를 쓰세요. 둘 다 없으면 /mcp 에서 skipper 서버를 인증(OAuth)해도 됩니다.",
+  "version": "0.7.13",
   "author": {
     "name": "SkipperLabs",
     "email": "support@skipperlabs.ai"
@@ -19,7 +19,7 @@
     "api_key": {
       "type": "string",
       "title": "SkipperLabs API 키",
-      "description": "support@skipperlabs.ai 에서 발급받은 sk-skp- 로 시작하는 키. 비워 두면 SKIPPER_API_KEY 환경변수를 사용합니다 (Claude Code 전용).",
+      "description": "support@skipperlabs.ai 에서 발급받은 sk-skp- 로 시작하는 키. 비워 두면 SKIPPER_API_KEY 환경변수를, 그것도 없으면 /mcp 의 OAuth 인증을 사용합니다 (Claude Code 전용).",
       "sensitive": true
     }
   }
