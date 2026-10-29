@@ -1,12 +1,12 @@
 # skipper-claude-plugins
 
 SkipperLabs 상장기업 리서치 플러그인 마켓플레이스 — 한국·미국 상장기업의 공시,
-지분, 재무, 배당, 뉴스를 연결한 지식그래프를 MCP 도구 35종으로 제공합니다.
+지분, 재무, 배당, 뉴스를 연결한 지식그래프를 MCP 도구 46종으로 제공합니다.
 Claude Code와 Claude 데스크탑 양쪽에서 쓸 수 있습니다.
 
 API 키는 SkipperLabs가 사용자별로 발급합니다 — support@skipperlabs.ai
 
-| 환경 | 도구 35종 | 스킬 | 설치 |
+| 환경 | 도구 46종 | 스킬 | 설치 |
 |---|---|---|---|
 | **Claude Code** | 플러그인에 포함 | 5종 | 마켓플레이스 2줄 |
 | **Claude 데스크탑 / Cowork** | **커넥터 별도 필요** | 4종 | 커넥터 + 플러그인 |
@@ -38,7 +38,7 @@ echo 'export SKIPPER_API_KEY=sk-skp-...' >> ~/.zshrc   # 기존 환경변수 방
 /mcp → plugin:skipper:skipper → Authenticate   # 키를 설정하지 않았을 때 — 브라우저 연결 화면에서 키를 한 번 입력
 ```
 
-재시작하면 `skipper` MCP 서버(도구 35종), 스킬 3종, `/skipper` 커맨드가
+재시작하면 `skipper` MCP 서버(도구 46종), 스킬 4종, `/skipper` 커맨드가
 활성화됩니다. 확인: `claude mcp list` 또는 `/skipper 삼성전자 주주 구성`.
 
 ### 자동 업데이트 켜기 (권장)
