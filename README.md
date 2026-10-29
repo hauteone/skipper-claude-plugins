@@ -24,7 +24,7 @@ claude plugin marketplace add hauteone/skipper-claude-plugins
 claude plugin install skipper@skipperlabs
 ```
 
-설치 후 API 키를 설정합니다 — 둘 중 하나면 됩니다.
+설치 후 인증을 설정합니다 — 셋 중 하나면 됩니다.
 
 ```
 /plugin configure skipper@skipperlabs      # 키체인에 저장, settings.json에 평문으로 남지 않음
@@ -32,6 +32,10 @@ claude plugin install skipper@skipperlabs
 
 ```bash
 echo 'export SKIPPER_API_KEY=sk-skp-...' >> ~/.zshrc   # 기존 환경변수 방식도 그대로 동작
+```
+
+```
+/mcp → plugin:skipper:skipper → Authenticate   # 키를 설정하지 않았을 때 — 브라우저 연결 화면에서 키를 한 번 입력
 ```
 
 재시작하면 `skipper` MCP 서버(도구 35종), 스킬 3종, `/skipper` 커맨드가
@@ -200,6 +204,7 @@ plugins/skipper/
 |---|---|---|
 | Claude Code | `/plugin configure skipper@skipperlabs` | macOS 키체인 (마스킹 입력) |
 | Claude Code | 셸 환경변수 `SKIPPER_API_KEY` | 셸 프로필 |
+| Claude Code | `/mcp` → `plugin:skipper:skipper` → Authenticate (OAuth) | 서버 발급 토큰 (키는 미저장) |
 | Claude Code 일괄 배포 | 조직 관리 설정 | managed-settings.json |
 | 데스크탑 / Cowork | 커넥터 연결 시 OAuth 동의 화면 | 서버 발급 토큰 (키는 미저장) |
 
@@ -209,7 +214,8 @@ Claude Code는 설치 시 자동으로 묻지 않습니다 — `/plugin configur
 입력이 마스킹되고 `settings.json`에 평문으로 남지 않습니다.
 
 둘 다 설정하면 `/plugin configure` 값이 우선하고, 비어 있으면 환경변수로
-폴백합니다.
+폴백합니다. 둘 다 비어 있으면 `/mcp`에서 OAuth로 인증할 수 있습니다 — 키가
+폐기·만료된 경우에는 OAuth로 넘어가지 않으니 키 설정을 비우거나 새 키를 넣으세요.
 
 ```bash
 # 셸 프로필(~/.zshrc 또는 ~/.bashrc)에 한 줄 추가 후 터미널 재시작
@@ -225,11 +231,16 @@ MCP 설정이 키를 두 경로로 동시에 넘깁니다.
 
 ```json
 "url": "https://api.skipperlabs.ai/mcp?apikey=${user_config.api_key}",
-"headers": { "X-API-Key": "${SKIPPER_API_KEY}" }
+"headers": { "X-API-Key": "${SKIPPER_API_KEY:-}" }
 ```
 
-API는 쿼리 파라미터를 먼저 보고, 비어 있으면 헤더로 폴백합니다. 그래서
-`/plugin configure`로 넣은 키와 환경변수 방식이 한 설정에서 함께 동작합니다.
+API는 쿼리 파라미터를 먼저 보고, 비어 있으면 헤더로, 헤더도 비어 있으면
+`Authorization: Bearer` 토큰으로 폴백합니다. 그래서 `/plugin configure`로 넣은
+키, 환경변수, OAuth 인증이 한 설정에서 함께 동작합니다.
+
+헤더의 `:-`(빈 기본값)는 빼면 안 됩니다. 환경변수가 없을 때 `${SKIPPER_API_KEY}`는
+치환되지 않은 문자열 그대로 전송되고, API가 이를 키로 검증하다 실패해 Bearer
+토큰을 보지 않습니다 — OAuth 인증을 마쳐도 401이 반복됩니다.
 
 데스크탑 커넥터는 이 경로를 쓰지 않습니다 — OAuth로 받은 Bearer 토큰을
 `Authorization` 헤더로 보냅니다.
@@ -253,7 +264,7 @@ claude plugin install skipper@skipperlabs
 
 조직 공용 API 키 1개를 관리 설정(managed settings)에 함께 배포하면, 사용자는
 아무것도 설정할 필요가 없습니다 (Claude Code 설치가 전부). 관리 설정의 `env`가
-모든 세션에 환경변수를 주입하므로 플러그인의 `${SKIPPER_API_KEY}` 참조가 자동으로
+모든 세션에 환경변수를 주입하므로 플러그인의 `${SKIPPER_API_KEY:-}` 참조가 자동으로
 채워집니다.
 
 **managed-settings.json** (전체 내용):
