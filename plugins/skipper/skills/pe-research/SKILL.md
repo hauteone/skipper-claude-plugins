@@ -2,10 +2,11 @@
 name: pe-research
 description: >
   한국·미국 상장기업 리서치와 PE 심사 실무 플레이북. 기업의 지분 구조, 공시 이력,
-  재무 검증, 배당, 증권사 리포트, 시장 전체 공시 스크리닝 질문에 사용한다.
-  skipper MCP 도구의 라우팅 전략과 인용 규율을 담고 있다. Use when researching
-  Korean or US listed companies — shareholders, disclosures, financials,
-  dividends, analyst reports, deal screening.
+  재무 검증, 배당, 증권사 리포트, 시장 전체 공시 스크리닝, 여러 기업의 정기공시
+  본문 주제 검색 질문에 사용한다. skipper MCP 도구의 라우팅 전략과 인용 규율을
+  담고 있다. Use when researching Korean or US listed companies — shareholders,
+  disclosures, financials, dividends, analyst reports, deal screening, full-text
+  search of periodic reports.
 ---
 
 # skipper PE 심사 리서치 플레이북
@@ -23,6 +24,7 @@ skipper MCP 서버를 사용해 상장기업을 조사할 때 아래 규율을 �
 |---|---|---|
 | 특정 기업의 주주 구성·지분율·지분공시(대량보유) 이력 | `shareholders_detail` | `get_document` |
 | 시장 전체 공시 스크리닝 (유상증자·CB·대량보유 등 "어떤 기업들이…") | `search_disclosures` | `get_document` |
+| 여러 기업의 사업·반기·분기보고서 **본문**에서 주제 언급 찾기 (해킹·정보보호, AI 도입, 공급망·원자재 위험, 소송·제재 등 "어떤 기업들이 보고서에 …를 썼나") | `search_filing_text` | `get_document` (`doc_id`=접수번호, `section`=장 제목) |
 | 주주 기준 역탐색 (국민연금 보유 기업, A사의 타법인출자·계열) | `shareholder_screen` | `shareholders_detail` |
 | 재무제표·수익성·증감 분석 | `financial_statements` | `api_income_statement`, `api_ratios` |
 | 부문·지역·제품별 매출 추이 (연도별·분기별 표) | `api_revenue_segments`(원천 직결, 표·기준·기간을 하나로 좁혀 줌) | `segment_series`(보고서 원문 섹션 동봉), `segment_facts`, `get_document` |
@@ -42,6 +44,22 @@ skipper MCP 서버를 사용해 상장기업을 조사할 때 아래 규율을 �
   복수로 열거하고, 경계 사례(조건을 아슬아슬하게 벗어난 기업)도 언급하면 좋다.
 - `search_disclosures` 결과의 `kind` 필드(신규결정/진행·결과/정정/상환·취득)로
   성격을 구분하라 — 신규 발행결정과 정정·상환을 섞어 세지 마라.
+- `search_disclosures`는 공시 **제목**만 보고, `search_filing_text`는 정기보고서
+  **본문**에서 낱말·구절이 나온 문단을 찾는다. 본문 검색은 이렇게 쓴다.
+  - 동의어·표기 변형(정보보호/정보 보호, 랜섬웨어/랜섬 웨어)은 `anyTerms`에 모두
+    나열하고, AI·LLM·ESG 같은 짧은 영문 약어는 `latinExact`에 넣는다.
+  - 대상 기업군(시가총액 상위 N곳, 그룹 계열사, 공급사 등)은 `api_screener`·
+    `shareholder_screen`·`graph_query` 등으로 종목코드를 먼저 고른 뒤 `companies`로
+    넘긴다. 업종·시장 거르기(`industries`·`markets`·`finSectors`)도 있다.
+  - 결과는 회사 단위로 나눠 온다. `totals`가 전체 규모이고 `nextCursor`가 있으면
+    이어 받는다 — 첫 쪽만 보고 전체를 말하지 마라.
+  - 답에는 첫 쪽 `coverage`(색인 범위, 검색한 회사·보고서 수)를 밝힌다.
+    `companiesWithoutReports`는 '언급 없음'이 아니라 '보고서 없음'(제출 전·수집 전·
+    범위 밖)이다. 0건이면 표기를 바꿔 다시 찾아본 뒤에도 "기재를 찾지 못했다"고만
+    쓰고 "기재하지 않았다"로 단정하지 마라.
+  - 보고서에 아직 반영되지 않은 최근 사고·제재는 본문 검색에 걸리지 않는다.
+    `hybrid_search`로 뉴스를 함께 보고, 뉴스로만 확인된 사실은 공시 기재와 나눠 표시한다.
+  - 출처는 '회사, 보고서명(접수번호), 장·절'로 적는다.
 - snippet으로 핵심 파악이 되면 건별 `get_document`는 꼭 필요한 소수 건만 한다.
 - 사업보고서 같은 대형 문서는 `get_document(doc_id, section="타법인출자")`처럼
   섹션을 정조준한다. 목차는 `__TOC__`로 먼저 확인할 수 있다. **섹션 키워드는
@@ -126,7 +144,9 @@ skipper MCP 서버를 사용해 상장기업을 조사할 때 아래 규율을 �
 2. **개요** — `company_profile` (섹터·최신지표·거래소 라이브 밸류에이션·관계·주요주주)
 3. **지배구조** — `shareholders_detail` (5% 주주 표·특수관계인 합계·소액주주·최근 2년
    지분공시) → 필요 시 `shareholder_screen`으로 계열·타법인출자 역탐색
-4. **자금조달·이벤트 이력** — `list_disclosures` / `search_disclosures` (기간 명시)
+4. **자금조달·이벤트 이력** — `list_disclosures` / `search_disclosures` (기간 명시).
+   정기보고서 본문의 위험 요인·소송·제재 서술은 `search_filing_text`
+   (`companies`=[대상 종목코드])로 찾는다
 5. **재무 검증** — `financial_statements` (연결+별도, YoY) → `financial_notes`로
    우발부채·약정·특수관계자 거래 확인
 6. **주주환원** — `dividend_history`
