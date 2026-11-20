@@ -1,12 +1,12 @@
 # skipper-claude-plugins
 
 SkipperLabs 상장기업 리서치 플러그인 마켓플레이스 — 한국·미국 상장기업의 공시,
-지분, 재무, 배당, 뉴스를 연결한 지식그래프를 MCP 도구 51종으로 제공합니다.
+지분, 재무, 배당, 뉴스를 연결한 지식그래프를 MCP 도구 74종으로 제공합니다.
 Claude Code와 Claude 데스크탑 양쪽에서 쓸 수 있습니다.
 
 API 키는 SkipperLabs가 사용자별로 발급합니다 — support@skipperlabs.ai
 
-| 환경 | 도구 51종 | 스킬 | 설치 |
+| 환경 | 도구 74종 | 스킬 | 설치 |
 |---|---|---|---|
 | **Claude Code** | 플러그인에 포함 | 5종 | 마켓플레이스 2줄 |
 | **Claude 데스크탑 / Cowork** | **커넥터 별도 필요** | 4종 | 커넥터 + 플러그인 |
@@ -38,7 +38,7 @@ echo 'export SKIPPER_API_KEY=sk-skp-...' >> ~/.zshrc   # 기존 환경변수 방
 /mcp → plugin:skipper:skipper → Authenticate   # 키를 설정하지 않았을 때 — 브라우저 연결 화면에서 키를 한 번 입력
 ```
 
-재시작하면 `skipper` MCP 서버(도구 51종), 스킬 4종, `/skipper` 커맨드가
+재시작하면 `skipper` MCP 서버(도구 74종), 스킬 4종, `/skipper` 커맨드가
 활성화됩니다. 확인: `claude mcp list` 또는 `/skipper 삼성전자 주주 구성`.
 
 ### 자동 업데이트 켜기 (권장)
@@ -129,7 +129,8 @@ MCP 인가 명세도 쿼리스트링 토큰을 금지하므로, 위의 OAuth 방
 
 ### 리서치 — `/skipper <질문>`
 
-예: `/skipper 삼성전자 최대주주 지분율 추이`, `/skipper 최근 1년 유상증자 결정한 코스닥 기업`
+예: `/skipper 삼성전자 최대주주 지분율 추이`, `/skipper 최근 1년 유상증자 결정한 코스닥 기업`,
+`/skipper 애플 최근 4분기 자사주 매입과 CEO 보수`
 
 `/skipper`로 질문하면 리서치 플레이북(도구 라우팅·인용 규율)이 자동 적용되고,
 기업 데이터는 skipper MCP 도구로만 조회하도록 강제됩니다.
@@ -160,6 +161,7 @@ DART 이용 예시 워크북의 세 개 탭을 CSV로 만들어 줍니다. UTF-8
 컨텍스트를 크게 소모합니다. `list-export` 스킬은 REST를 직접 호출해 컨텍스트를
 거치지 않고 로컬 CSV로 저장하고, 대화에는 건수·경로·미리보기만 보여줍니다.
 리서치 중 목록 결과가 많아 일부만 표시하게 되면 먼저 제안합니다.
+미국 종목 도구(`us_*`)의 목록은 대상이 아닙니다 — 이 스킬이 부르는 공개 REST에 미국 경로가 없습니다.
 
 예: `/skipper:list-export 스크리너 KOSPI 전체`, `/skipper:list-export 005930 공시 전부 CSV로`
 

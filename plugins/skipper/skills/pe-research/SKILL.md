@@ -18,7 +18,8 @@ skipper MCP 서버를 사용해 상장기업을 조사할 때 아래 규율을 �
 ## 1. 도구 라우팅 — 질문 유형별 최적 경로
 
 **기업 확정이 먼저다.** 회사명이 조금이라도 모호하면 `resolve_company`(또는
-`api_search`)로 6자리 종목코드를 확정한 뒤 진행한다.
+`api_search`)로 6자리 종목코드를 확정한 뒤 진행한다. 미국 종목은
+`us_search`로 티커를 확정한다(아래 '미국 종목').
 
 | 질문 유형 | 1순위 도구 | 보조 |
 |---|---|---|
@@ -36,7 +37,7 @@ skipper MCP 서버를 사용해 상장기업을 조사할 때 아래 규율을 �
 | 증권사 리포트 — 애널리스트 분석·목표주가 근거·실적 추정·산업 전망 | `search_research` (`code`로 종목 제한, `days`로 기간 제한, `broker`로 증권사 필터) | `get_research_report` (`report_id` 전문, `pages`로 특정 페이지) |
 | 뉴스·이벤트·정성 질문 | `hybrid_search` | `list_disclosures`로 교차 검증 |
 | 집계·순위·관계 탐색 (그래프 구조 질문) | `graph_query` | — |
-| 시세·수급·ETF·컨센서스·스크리너 | `api_*` 정형 데이터 도구 | — |
+| 시세·수급·ETF·컨센서스·스크리너 (한국 종목) | `api_*` 정형 데이터 도구 | — |
 
 주의:
 - "지분 30% 미만 기업" 같은 **조건 스크리닝은 `shareholder_screen`이 정답**이다 —
@@ -96,10 +97,49 @@ skipper MCP 서버를 사용해 상장기업을 조사할 때 아래 규율을 �
   지분법이익 등 영업외 수익이 섞였을 수 있다 — 지주회사에서 흔하다. 값이 맞아도
   '매출'로 인용하면 오독이므로 연결 주석 '영업부문별 정보'에서 수익 구성을 확인한다.
 
+### 미국 종목
+
+**미국 종목은 `us_*` 도구로 조사한다.** `api_*` 정형 데이터 도구는 한국 종목
+전용이라 미국 티커를 넣으면 빈 결과가 온다. 회사명이 모호하면 `us_search`로
+티커를 확정한다(같은 회사의 클래스 주식은 한 줄로 묶여 `otherSymbols`로 온다).
+
+| 질문 유형 | 1순위 도구 | 보조 |
+|---|---|---|
+| 회사 개요 | `us_profile` | `company_profile` |
+| 재무 3표·재무비율·밸류에이션 | `us_income_statement`·`us_balance_sheet`·`us_cash_flow`, `us_ratios` | `us_filing_document`(`note`로 주석 하나) |
+| 재무제표 밖 숫자 — 주식 수(클래스별 표지 유통주식수)·자사주 매입·주식 보상·희석·장기부채 원금 만기·주당 배당·임원 보수(CEO 사람별, Pay versus Performance)·감사인 | `us_report_facts`(`symbol`) | `us_filing_document` |
+| 위 숫자의 회사 순위 (자사주 매입 금액 상위, CEO 보수 상위 등) | `us_report_facts`(`symbol` 없이 `metric` 하나와 `period`) | — |
+| 분기 추정치·목표주가·투자의견 | `us_analyst_estimates`, `us_price_target` | — |
+| 실적 발표 일정·서프라이즈 이력 | `us_earnings_calendar`, `us_earnings_surprises` | `us_transcript` |
+| 어닝콜 전문(경영진 발표·질의응답) | `us_transcript` | — |
+| 일별 시세·기간 수익률·52주 범위 | `us_historical_prices` | — |
+| SEC 공시 목록·본문 | `us_filings` → `us_filing_document`(Item은 `section`, 주석은 `note`, 8-K 실적 보도자료는 `section='EX-99.1'`) | — |
+| 5% 이상 대량보유·내부자 거래·13F 기관 보유·공매도 잔고 | `us_ownership`, `us_insider_trades`, `us_institutional_holders`, `us_short_interest` | — |
+| 미국 ETF 정보·구성종목·이 종목을 담은 ETF | `us_etf_info`, `us_etf_holdings`, `us_etf_holders` | — |
+| 국내 증권사의 미국 기업 리포트 | `api_kr_research_reports`(`query`에 회사의 한글 이름) → `api_kr_research_report` | — |
+| 뉴스·관계·공급망 | `hybrid_search`(`market="US"`), `graph_query` | — |
+
+`us_report_facts` 사용 규칙:
+- `period` 키는 기간 끝에서 가장 가까운 달력 분기 끝이다(2025Q4, 연간 2025FY).
+  1월 결산 회사의 FY2026이 2025FY로 묶이는 것처럼 회사가 부르는 회계연도와 다를
+  수 있다 — 답에는 `periodStart`~`periodEnd`를 함께 적는다.
+- `calc`가 있는 값은 회사가 적지 않은 값을 계산한 것이다(분기 = 누계의 차이,
+  표지 주식 수 = 클래스 합). 인용할 때 계산 값이라고 밝힌다. 클래스 합은 클래스
+  간 전환 비율을 반영하지 않은 단순 합이다.
+- `suspect`가 있는 값은 회사가 단위를 틀리게 적었을 가능성이 큰 값이다 — 그대로
+  인용하지 말고 의심된다고 밝히거나 `us_filing_document`로 원문을 확인한다. 순위는
+  기본으로 이 값을 빼고 `suspectsHidden`에 수를 준다.
+- `member`가 있는 행은 클래스별(표지 주식 수)·사람별(CEO 보수) 값이다. 한 해에
+  CEO가 둘 이상이면 사람별 행이 따로 온다 — 합치지 마라.
+- 손익·재무상태표 숫자는 이 도구에 없다 — `us_income_statement` 등으로 간다.
+
 ## 2. 인용 규율 — 모든 수치에 출처와 기준을 단다
 
 - 공시 인용: **접수번호(rcept_no)와 접수일자**를 함께 표기한다. 접수번호는 도구
   결과의 값을 **그대로 복사**한다 — 절대 만들어내지 마라.
+- 미국 공시 인용: 회사명·서식(10-K·10-Q·8-K·DEF 14A)·접수번호(accession number)·
+  Item 또는 주석 번호. 미국 회사는 회계연도가 달력과 다를 수 있으니 기간은 기말
+  날짜와 함께 적고, 금액은 보고 통화 그대로 쓴다.
 - 뉴스 인용: 제목·발행일·언론사. 내부 ID(kr:*, 뉴스 번호)는 인용 금지.
 - 리포트 인용: **증권사·리포트 제목·발행일(p.페이지)** 형식. 애널리스트의
   의견·추정·목표주가는 공시된 사실과 구분해 서술하고, 목표주가·투자의견에는
@@ -154,6 +194,12 @@ skipper MCP 서버를 사용해 상장기업을 조사할 때 아래 규율을 �
 8. **애널리스트 시각** — `search_research`(대상 종목 `code`, 최근 `days`)로
    증권사 리포트를 검색해 핵심 논지·목표주가·투자의견·실적 추정을 요약하고,
    근거 확인이 필요한 부분은 `get_research_report`로 전문을 연다
+
+미국 기업은 같은 순서를 `us_*` 도구로 조립한다 — `us_search` → `us_profile` →
+`us_ownership`·`us_insider_trades`·`us_institutional_holders` → `us_filings` →
+`us_income_statement` 등과 `us_filing_document`(`note`) → `us_report_facts`(자사주
+매입·주당 배당·임원 보수) → `us_historical_prices`·`us_analyst_estimates`·
+`us_price_target` → `us_transcript`·`api_kr_research_reports`.
 
 각 단계의 근거(접수번호·기준일)를 모아 최종 답변에서 출처 목록으로 정리한다.
 
