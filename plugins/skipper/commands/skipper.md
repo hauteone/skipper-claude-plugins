@@ -1,5 +1,5 @@
 ---
-description: 한국·미국 상장기업 리서치 — skipper MCP 도구 51종 + PE 심사 플레이북으로 조사
+description: 한국·미국 상장기업 리서치 — skipper MCP 도구 74종 + PE 심사 플레이북으로 조사
 argument-hint: "<질문 — 예: 삼성전자 최대주주 지분율 추이>"
 allowed-tools: mcp__skipper, Skill, ToolSearch, Read
 ---
@@ -20,6 +20,7 @@ allowed-tools: mcp__skipper, Skill, ToolSearch, Read
 - 기업 데이터(지분·공시·재무·배당·시세·뉴스)는 **오직 skipper MCP 도구로만**
   조회한다. WebSearch·WebFetch·학습된 지식으로 수치나 사실을 답하지 마라.
 - 회사명이 조금이라도 모호하면 `resolve_company`로 종목코드를 확정한 뒤 진행한다.
+  미국 종목은 `us_search`로 티커를 확정한다.
 - 모든 수치·사실 주장에는 근거 도구와 출처(공시 접수번호·rcept_no, 문서명,
   기준일)를 인용한다 — 플레이북의 인용 규율을 따른다.
 - 도구 결과가 비어 있으면 "데이터 없음"을 명시하고, 지어내지 마라.
